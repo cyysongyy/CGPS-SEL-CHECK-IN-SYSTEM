@@ -41,6 +41,8 @@ th,td{text-align:left;padding:7px 6px;border-bottom:1px solid var(--line);vertic
 .dot.red{background:var(--red)}.dot.blue{background:var(--blue)}.dot.yellow{background:var(--yellow)}.dot.green{background:var(--green)}
 .hide{display:none}
 .demo{background:#fff7ed;color:#9a3412;padding:8px 14px;font-size:14px;text-align:center}
+.rpt-head h2{margin:4px 0}.rpt-sum ul{margin:0;padding-left:20px;line-height:1.9}.rpt-sum .up{color:#b91c1c}.rpt-sum .down{color:#047857}
+@media print{header,.st-tabs,.no-print,#viewTabs,.demo{display:none!important}body{background:#fff}.st-card,.st-sum div{box-shadow:none;border:1px solid #e5e7eb;break-inside:avoid}}
 </style>
 </head>
 <body>
@@ -63,8 +65,9 @@ th,td{text-align:left;padding:7px 6px;border-bottom:1px solid var(--line);vertic
     <a href="teacher.html">班級看板</a>
   </header>
   <div class="wrap">
-    <div class="st-tabs" id="viewTabs"><button data-v="today" class="on">📅 今日總覽</button><button data-v="stats">📈 趨勢統計（短／中／長期）</button></div>
+    <div class="st-tabs" id="viewTabs"><button data-v="today" class="on">📅 今日總覽</button><button data-v="stats">📈 趨勢統計（短／中／長期）</button><button data-v="report">📄 全校報告（每天／週／月）</button></div>
     <div id="statsView" class="hide"></div>
+    <div id="reportView" class="hide"></div>
     <div id="todayView">
     <div class="stats" id="stats"></div>
     <div id="alerts"></div>
@@ -79,6 +82,7 @@ th,td{text-align:left;padding:7px 6px;border-bottom:1px solid var(--line);vertic
 <script src="faces.js"></script>
 <script src="animals.js"></script>
 <script src="stats.js"></script>
+<script src="report.js"></script>
 <script src="config.js"></script>
 <script>
 /* ========= 設定 ========= */
@@ -141,15 +145,29 @@ async function loadStats(){
 $('statsView').onclick=e=>{const b=e.target.closest('.st-tabs button');if(b){sDays=+b.dataset.days;loadStats()}};
 $('statsView').onchange=e=>{if(e.target.id==='sCls'){sCls=e.target.value;loadStats()}};
 async function load(){
-  $('todayView').classList.toggle('hide',view!=='today');$('statsView').classList.toggle('hide',view!=='stats');
+  $('todayView').classList.toggle('hide',view!=='today');$('statsView').classList.toggle('hide',view!=='stats');$('reportView').classList.toggle('hide',view!=='report');
   try{const r=await getOverview($('date').value);if(!r.ok)throw new Error(r.error);data=r}catch(e){$('meta').textContent='載入失敗：'+e.message;return}
   if(view==='stats'){loadStats();return}
+  if(view==='report'){loadReport();return}
   render();
 }
 const CHG_ZH={improved:'好轉',same:'持平',shifted:'轉換',worsened:'轉差'}, CHG_ICON={improved:'↑',same:'＝',shifted:'⇄',worsened:'↓'};
 const changeKind=(a,b)=>a===b?'same':b==='green'?'improved':a==='green'?'worsened':'shifted';
 const cell=x=>x?`<span class="dot ${x.color}"></span>${x.emotion?SELFaces.html(x.emotion,22):esc(COLOR[x.color])}`:'<span class="mute">—</span>';
 const need=s=>s.color&&!s.fu&&(s.color==='red'||(s.color==='blue'&&s.note));
+let rMode='week';
+async function loadReport(){
+  const bar='<div class="no-print" style="display:flex;gap:10px;align-items:flex-start;flex-wrap:wrap">'+SELReport.tabs(rMode)+'<button id="rptPrint" style="margin:6px 0 12px;padding:7px 14px;border-radius:999px;border:2px solid #374151;background:#fff;font-size:15px;cursor:pointer">🖨 列印／存成 PDF</button></div>';
+  if(DEMO){$('reportView').innerHTML=bar+'<div class="mute">展示模式不提供報告，部署 Apps Script 後即可使用。</div>';return}
+  $('reportView').innerHTML=bar+'<div class="mute">報告產生中…</div>';
+  try{
+    const m=SELReport.MODES.find(x=>x.id===rMode);
+    const d=await (await fetch(GAS_URL+'?'+new URLSearchParams({action:'stats',days:m.days,pass:PASS}))).json();
+    if(!d.ok)throw new Error(d.error);
+    $('reportView').innerHTML=bar+SELReport.html(d,rMode);
+  }catch(e){$('reportView').innerHTML=bar+'<div class="mute">載入失敗：'+esc(e.message)+'</div>'}
+}
+$('reportView').onclick=e=>{const b=e.target.closest('#rptTabs button');if(b){rMode=b.dataset.m;loadReport();return}if(e.target.id==='rptPrint')window.print()};
 function render(){
   const cnt={red:0,blue:0,yellow:0,green:0,none:0};let total=0;
   data.classes.forEach(c=>c.students.forEach(s=>{total++;cnt[s.color||'none']++}));
