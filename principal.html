@@ -70,6 +70,7 @@ th,td{text-align:left;padding:7px 6px;border-bottom:1px solid var(--line);vertic
     <div id="reportView" class="hide"></div>
     <div id="todayView">
     <div class="stats" id="stats"></div>
+    <div id="wkWarn"></div>
     <div id="alerts"></div>
     <h2>各班概況（點班級看學生姓名與情緒）</h2>
     <div class="classes" id="classes"></div>
@@ -149,12 +150,18 @@ async function load(){
   try{const r=await getOverview($('date').value);if(!r.ok)throw new Error(r.error);data=r}catch(e){$('meta').textContent='載入失敗：'+e.message;return}
   if(view==='stats'){loadStats();return}
   if(view==='report'){loadReport();return}
+  loadWarn();
   render();
 }
 const CHG_ZH={improved:'好轉',same:'持平',shifted:'轉換',worsened:'轉差'}, CHG_ICON={improved:'↑',same:'＝',shifted:'⇄',worsened:'↓'};
 const changeKind=(a,b)=>a===b?'same':b==='green'?'improved':a==='green'?'worsened':'shifted';
 const cell=x=>x?`<span class="dot ${x.color}"></span>${x.emotion?SELFaces.html(x.emotion,22):esc(COLOR[x.color])}`:'<span class="mute">—</span>';
 const need=s=>s.color&&!s.fu&&(s.color==='red'||(s.color==='blue'&&s.note));
+let warnAt=0;
+async function loadWarn(){   // 一週預警橫幅（最多每 5 分鐘重新計算一次，避免每分鐘自動更新時重複運算）
+  if(DEMO||Date.now()-warnAt<300000)return;warnAt=Date.now();
+  try{const d=await (await fetch(GAS_URL+'?'+new URLSearchParams({action:'stats',days:7,pass:PASS}))).json();if(d.ok)$('wkWarn').innerHTML=SELStats.warnBanner(d,true)}catch(e){warnAt=0}
+}
 let rMode='week';
 async function loadReport(){
   const bar='<div class="no-print" style="display:flex;gap:10px;align-items:flex-start;flex-wrap:wrap">'+SELReport.tabs(rMode)+'<button id="rptPrint" style="margin:6px 0 12px;padding:7px 14px;border-radius:999px;border:2px solid #374151;background:#fff;font-size:15px;cursor:pointer">🖨 列印／存成 PDF</button></div>';
