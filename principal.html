@@ -59,6 +59,7 @@ th,td{text-align:left;padding:7px 6px;border-bottom:1px solid var(--line);vertic
     <input type="date" id="date">
     <button id="refresh">🔄 重新整理</button>
     <button id="csvBtn">⬇ 匯出CSV</button>
+    <button id="clrAll" style="background:#fee2e2;color:#991b1b">🗑 清除全校當天資料</button>
     <a href="teacher.html">班級看板</a>
   </header>
   <div class="wrap">
@@ -117,7 +118,7 @@ async function login(){
 }
 function start(){
   $('loginView').classList.add('hide');$('app').classList.remove('hide');if(DEMO)$('demo').classList.remove('hide');
-  $('date').value=todayStr();$('date').onchange=load;$('refresh').onclick=load;$('csvBtn').onclick=exportCsv;
+  $('date').value=todayStr();$('date').onchange=load;$('refresh').onclick=load;$('csvBtn').onclick=exportCsv;$('clrAll').onclick=()=>clearDay('');
   load();clearInterval(timer);timer=setInterval(load,REFRESH_MS);
 }
 try{const sp=sessionStorage.getItem('sel_ppass');if(sp){PASS=sp;getOverview(todayStr()).then(r=>{if(r.ok)start()}).catch(()=>{})}}catch(e){}
@@ -164,9 +165,27 @@ function render(){
       <div class="mute">👋${c.students.filter(s=>s.ci).length} 🏁${c.students.filter(s=>s.co).length}　好轉↑${c.students.filter(s=>s.change==='improved').length} 轉差↓${c.students.filter(s=>s.change==='worsened').length}</div></div>`}).join('')||'<div class="mute">尚無名單，請先匯入 Roster。</div>';
   $('classes').onclick=e=>{const c=e.target.closest('.cc');if(c){openCls=openCls===c.dataset.c?'':c.dataset.c;render()}};
   const oc=data.classes.find(c=>c.cls===openCls);
-  $('detail').innerHTML=oc?`<div class="detail"><b>${clsLabel(oc.cls)}（${esc($('date').value)}）</b><table><tr><th>座號</th><th>姓名</th><th>👋 Check-in</th><th>🏁 Check-out</th><th>變化</th><th>留言</th><th>處遇</th></tr>`+
+  $('detail').innerHTML=oc?`<div class="detail"><b>${clsLabel(oc.cls)}（${esc($('date').value)}）</b> <button id="clrCls" style="margin-left:10px;background:#fee2e2;color:#991b1b">🗑 清除此班當天資料</button><table><tr><th>座號</th><th>姓名</th><th>👋 Check-in</th><th>🏁 Check-out</th><th>變化</th><th>留言</th><th>處遇</th></tr>`+
     oc.students.map(s=>`<tr><td>${SELAnimals.html(s.avatar,36)} ${s.seat}</td><td>${esc(s.name)}</td><td>${cell(s.ci)}</td><td>${cell(s.co)}</td><td>${s.change?`<span class="chg ${s.change}">${CHG_ZH[s.change]}${CHG_ICON[s.change]}</span>`:''}</td><td>${esc(s.note||'')}</td><td>${s.fu?esc(s.fu.status)+(s.fu.note?'：'+esc(s.fu.note):''):''}</td></tr>`).join('')+'</table></div>':'';
+  if($('clrCls'))$('clrCls').onclick=()=>clearDay(openCls);
   $('meta').textContent=`${$('date').value} · 更新 ${new Date().toTimeString().slice(0,5)} · 每分鐘自動更新`;
+}
+async function clearDay(cls){
+  const date=$('date').value, what=cls?clsLabel(cls):'全校所有班級';
+  if(!confirm(`確定要清除「${what}」${date} 的簽到紀錄嗎？\n清除後學生可以重新 Check-in。`))return;
+  if(!cls&&!confirm(`再確認一次：這會清掉全校 ${date} 的所有簽到紀錄。`))return;
+  try{
+    let r;
+    if(DEMO){
+      const ck=store.get('sel_demo_checkins',[]),keep=ck.filter(c=>!(c.date===date&&(!cls||c.cls===cls)));
+      localStorage.setItem('sel_demo_checkins',JSON.stringify(keep));r={ok:true,deleted:ck.length-keep.length};
+    }else{
+      r=await (await fetch(GAS_URL,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'clearDay',pass:PASS,date,cls})})).json();
+    }
+    if(!r.ok)throw new Error(r.error);
+    alert(`已清除 ${r.deleted} 筆（已備份在試算表的 Deleted 分頁）`);
+  }catch(e){alert('清除失敗：'+e.message)}
+  load();
 }
 function exportCsv(){
   const rows=[['班級','日期','座號','姓名','Check-in 顏色','Check-in 情緒','Check-out 顏色','Check-out 情緒','當天變化','備註（最新）','處遇狀態']];

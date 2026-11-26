@@ -423,6 +423,29 @@ function doPost(e) {
     }
     var acc = access_(b.pass);
     if (!acc) return out_({ ok: false, error: 'auth' });
+    if (a === 'clearDay') {   // 僅校長：清除某天（預設今天）的簽到紀錄，可指定班級；刪除前先備份到 Deleted 分頁
+      if (acc.role !== 'principal') return out_({ ok: false, error: 'forbidden' });
+      var dday = str_(b.date, 10) || today_(), dcls = str_(b.cls, 10), dn = 0, dfn = 0, dbk = [];
+      [['Checkins', 'Checkins'], ['Followups', 'Followups']].forEach(function (pair) {
+        var dsh = sheet_(pair[0]), dv = dsh.getDataRange().getValues(), dh = dv[0];
+        var dCc = dh.indexOf('班級'), dCd = dh.indexOf('日期');
+        if (dCc < 0 || dCd < 0) return;
+        for (var d = dv.length - 1; d >= 1; d--) {
+          if (dateStr_(dv[d][dCd]) !== dday) continue;
+          if (dcls && String(dv[d][dCc]) !== dcls) continue;
+          dbk.push([now_(), pair[0]].concat(dv[d].map(function (x) { return x instanceof Date ? dateStr_(x) : x; })));
+          dsh.deleteRow(d + 1);
+          if (pair[0] === 'Checkins') dn++; else dfn++;
+        }
+      });
+      if (dbk.length) {
+        var bsh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Deleted') || SpreadsheetApp.getActiveSpreadsheet().insertSheet('Deleted');
+        if (bsh.getLastRow() === 0) bsh.appendRow(['刪除時間', '來源分頁', '原資料…']);
+        var w = Math.max.apply(null, dbk.map(function (r) { return r.length; }));
+        bsh.getRange(bsh.getLastRow() + 1, 1, dbk.length, w).setValues(dbk.map(function (r) { while (r.length < w) r.push(''); return r; }));
+      }
+      return out_({ ok: true, deleted: dn, followups: dfn });
+    }
     if (!can_(acc, b.cls)) return out_({ ok: false, error: 'forbidden' });
     if (a === 'clearAvatar') {   // 老師（自己班）或校長：重設某位學生的圖案，讓他可以重新選一次
       var csh2 = sheet_('Roster'), cv = csh2.getDataRange().getValues(), ccol = cv[0].indexOf('圖案');
