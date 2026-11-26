@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>SEL 教師看板</title>
+<style>
+:root{--red:#e5484d;--blue:#3b82f6;--yellow:#f5b301;--green:#2fa86b;--none:#9ca3af;--ink:#1f2937;--mute:#6b7280;--bg:#f4f5fa;--line:#e5e7eb;--pri:#4f46e5}
+*{box-sizing:border-box}
+body{margin:0;font-family:"Noto Sans TC","PingFang TC","Microsoft JhengHei",system-ui,sans-serif;background:var(--bg);color:var(--ink);font-size:16px}
+header{background:var(--pri);color:#fff;padding:12px 16px;display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+header h1{font-size:19px;margin:0;flex:1;min-width:150px}
+header select,header input,header button{font-size:15px;padding:8px 10px;border-radius:10px;border:0;font-family:inherit}
+header button{background:#fff;color:var(--pri);font-weight:700;cursor:pointer}
+.wrap{max-width:1100px;margin:0 auto;padding:14px}
+.login{max-width:340px;margin:60px auto;background:#fff;padding:24px;border-radius:16px;text-align:center;box-shadow:0 2px 10px rgba(0,0,0,.08)}
+.login input{width:100%;font-size:18px;padding:12px;border:2px solid var(--line);border-radius:10px;margin:12px 0}
+.login button{width:100%;background:var(--pri);color:#fff;border:0;border-radius:10px;padding:12px;font-size:17px;font-weight:700;cursor:pointer}
+.stats{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+.chip{flex:1;min-width:84px;border-radius:12px;padding:10px;color:#fff;text-align:center;cursor:pointer;border:3px solid transparent;font-weight:700}
+.chip b{display:block;font-size:26px}.chip.on{border-color:#111}
+.chip.red{background:var(--red)}.chip.blue{background:var(--blue)}.chip.yellow{background:var(--yellow);color:#3a2b00}.chip.green{background:var(--green)}.chip.none{background:var(--none)}.chip.all{background:#374151}
+.alert{background:#fef2f2;border:2px solid var(--red);border-radius:12px;padding:10px 14px;margin-bottom:12px;color:#7f1d1d}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
+.s{background:#fff;border-radius:14px;padding:10px;border-left:10px solid var(--none);cursor:pointer;box-shadow:0 1px 5px rgba(0,0,0,.07);position:relative}
+.s.red{border-color:var(--red)}.s.blue{border-color:var(--blue)}.s.yellow{border-color:var(--yellow)}.s.green{border-color:var(--green)}
+.s .top{display:flex;justify-content:space-between;font-weight:700}
+.s .g{font-size:14px;margin-top:4px}.s .n{font-size:13px;color:var(--mute);margin-top:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.s .st{font-size:12px;margin-top:4px;color:#047857}
+.pm2{display:flex;align-items:center;gap:3px;margin-top:6px;font-size:12px;flex-wrap:wrap}
+.pm2 .arr{color:#94a3b8}
+.chg{font-size:11px;padding:1px 7px;border-radius:8px;color:#fff;font-weight:700;margin-left:2px}
+.chg.improved{background:var(--green)}.chg.worsened{background:var(--red)}.chg.shifted{background:#f59e0b}.chg.same{background:#94a3b8}
+.cbox{background:#fff;border-radius:14px;padding:10px 14px;margin-bottom:12px;box-shadow:0 1px 5px rgba(0,0,0,.07)}
+.cbox h4{margin:0 0 6px;font-size:15px}
+.cbox .row{display:flex;align-items:center;gap:6px;padding:4px 0;border-top:1px solid #f1f5f9;font-size:14px;flex-wrap:wrap}
+.cbox .sum{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:4px}
+.s.urgent{outline:3px solid var(--red)}
+.badge{position:absolute;top:-6px;right:-6px;background:var(--red);color:#fff;border-radius:10px;font-size:12px;padding:1px 7px;font-weight:700}
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;padding:12px;z-index:10}
+.modal>div{background:#fff;border-radius:16px;max-width:520px;width:100%;max-height:92vh;overflow:auto;padding:18px}
+.modal h3{margin:0 0 6px}
+.hist{display:flex;gap:4px;flex-wrap:wrap;margin:8px 0}
+.dot{width:30px;height:30px;border-radius:50%;text-align:center;line-height:30px;font-size:11px;color:#fff;background:var(--none)}
+.dot.red{background:var(--red)}.dot.blue{background:var(--blue)}.dot.yellow{background:var(--yellow);color:#3a2b00}.dot.green{background:var(--green)}
+.modal select,.modal textarea,.modal input,.modal textarea{width:100%;font-size:16px;padding:9px;border:2px solid var(--line);border-radius:10px;margin:4px 0;font-family:inherit}
+.btn{background:var(--pri);color:#fff;border:0;border-radius:10px;padding:10px 16px;font-size:16px;font-weight:700;cursor:pointer;font-family:inherit}
+.btn.g{background:#e5e7eb;color:var(--ink)}
+.log{font-size:14px;border-top:1px solid var(--line);padding:6px 0}
+.hide{display:none}.mute{color:var(--mute);font-size:14px}
+textarea.roster{height:240px}
+.demo{background:#fff7ed;color:#9a3412;padding:8px 14px;font-size:14px;text-align:center}
+</style>
+</head>
+<body>
+<div id="loginView" class="login">
+  <h2>🌈 SEL 教師看板</h2>
+  <div class="mute">請輸入教師密碼</div>
+  <input type="password" id="pass" placeholder="教師密碼" autocomplete="current-password">
+  <button id="loginBtn">進入</button>
+  <div id="loginErr" style="color:#b91c1c;margin-top:8px"></div>
+</div>
+
+<div id="app" class="hide">
+  <div class="demo hide" id="demo">⚠️ 展示模式：資料只存在這台裝置（密碼任意）。設定 GAS_URL 後才會讀取全校資料。</div>
+  <header>
+    <h1>🌈 SEL 情緒看板</h1>
+    <select id="clsSel"></select>
+    <input type="date" id="date">
+    <button id="refresh">🔄 重新整理</button>
+    <button id="rosterBtn">📋 班級名單</button>
+    <button id="csvBtn">⬇ 匯出CSV</button>
+    <a id="pLink" class="hide" href="principal.html" style="color:#fff;font-size:14px">🏫 校長總控台</a>
+  </header>
+  <div class="wrap">
+    <div class="st-tabs" id="viewTabs"><button data-v="today" class="on">📅 今日</button><button data-v="stats">📈 趨勢統計（短／中／長期）</button></div>
+    <div id="statsView" class="hide"></div>
+    <div id="todayView">
+    <div id="alerts"></div>
+    <div id="changeBox"></div>
+    <div class="stats" id="stats"></div>
+    <div class="mute" id="meta" style="margin-bottom:8px"></div>
+    <div class="grid" id="grid"></div>
+    </div>
+  </div>
+</div>
+<div id="modal" class="modal hide"><div id="modalBody"></div></div>
+
+<script src="faces.js"></script>
+<script src="animals.js"></script>
+<script src="stats.js"></script>
+<script src="config.js"></script>
+<script>
+/* ========= 設定 ========= */
+const GAS_URL = window.SEL_GAS_URL || 'YOUR_APPS_SCRIPT_WEB_APP_URL_HERE';   // 網址在 config.js 設定
+const GRADES=[1,2,3,4,5,6], GRADE_ZH=['','一','二','三','四','五','六'], CLASS_NAMES=['甲'], REFRESH_MS=60000;
+const COLOR = {red:{zh:'紅·生氣',p:3},blue:{zh:'藍·沮喪',p:2},yellow:{zh:'黃·焦慮',p:1},green:{zh:'綠·平和',p:0}};
+const FOLLOW_STATUS = ['已關懷','持續追蹤','已轉介輔導','已通知家長','暫不需處理'];
+/* ========================= */
+const $=id=>document.getElementById(id), DEMO=GAS_URL.startsWith('YOUR_');
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const store={get(k,d){try{return JSON.parse(localStorage.getItem(k))??d}catch(e){return d}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}};
+const todayStr=()=>{const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')};
+let ACCESS=null, PASS='', cls='', data={checkins:[],followups:[],roster:[]}, filter='all', timer=null;
+
+async function get(params){
+  if(DEMO) return demoGet(params);
+  const r=await fetch(GAS_URL+'?'+new URLSearchParams({...params,pass:PASS})); return r.json();
+}
+async function post(body){
+  if(DEMO) return demoPost(body);
+  const r=await fetch(GAS_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({...body,pass:PASS})}); return r.json();
+}
+/* 展示模式（localStorage，與學生頁同一網域時可看到簽到） */
+function demoGet(p){
+  if(p.action==='login'){const cl=[];GRADES.forEach(g=>CLASS_NAMES.forEach(c=>cl.push(g+c)));return {ok:true,role:'principal',name:'展示',classes:cl}}
+  const all=store.get('sel_demo_checkins',[]).filter(c=>c.cls===p.cls);
+  if(p.action==='today') return {ok:true,checkins:all.filter(c=>c.date===p.date),followups:store.get('sel_demo_fu',[]).filter(f=>f.cls===p.cls&&f.date===p.date),roster:store.get('sel_roster_'+p.cls,[])};
+  if(p.action==='history') return {ok:true,history:all.filter(c=>c.seat==p.seat),followups:store.get('sel_demo_fu',[]).filter(f=>f.cls===p.cls&&f.seat==p.seat)};
+  return {ok:false};
+}
+function demoPost(b){
+  if(b.action==='saveRoster'){store.set('sel_roster_'+b.cls,b.roster);return {ok:true}}
+  if(b.action==='clearAvatar'){const k='sel_roster_'+b.cls,a=store.get(k,[]),r=a.find(x=>x.seat===b.seat);if(r)r.avatar='';store.set(k,a);return {ok:true}}
+  if(b.action==='followup'){const a=store.get('sel_demo_fu',[]);a.push({...b,date:todayStr(),time:new Date().toTimeString().slice(0,8)});store.set('sel_demo_fu',a);return {ok:true}}
+  return {ok:false};
+}
+
+/* 登入 */
+$('loginBtn').onclick=login; $('pass').onkeydown=e=>{if(e.key==='Enter')login()};
+async function login(){
+  PASS=$('pass').value; $('loginErr').textContent='';
+  if(!PASS) return;
+  try{
+    const r=await get({action:'login'});
+    if(!r.ok) throw 0;
+    ACCESS=r;
+  }catch(e){ $('loginErr').textContent='密碼錯誤或無法連線'; return; }
+  try{sessionStorage.setItem('sel_pass',PASS)}catch(e){}
+  start();
+}
+const clsLabel=c=>(GRADE_ZH[c[0]]||c[0])+'年'+c.slice(1)+'班';
+function start(){
+  $('loginView').classList.add('hide'); $('app').classList.remove('hide');
+  if(DEMO) $('demo').classList.remove('hide');
+  // 老師只看得到自己的班（由後端決定）；校長可看全部並可進總控台
+  if(ACCESS.role==='principal') $('pLink').classList.remove('hide');
+  const list=ACCESS.classes||[];
+  $('clsSel').innerHTML=(list.length>1?'<option value="">選擇班級</option>':'')+list.map(c=>`<option value="${c}">${clsLabel(c)}</option>`).join('');
+  if(list.length<=1)$('clsSel').classList.add('hide');
+  $('date').value=todayStr();
+  const my=store.get('sel_teacher_class','');
+  if(list.includes(my))$('clsSel').value=my;
+  $('clsSel').onchange=$('date').onchange=load;
+  $('refresh').onclick=load; $('rosterBtn').onclick=rosterEditor; $('csvBtn').onclick=exportCsv;
+  $('modal').onclick=e=>{if(e.target.id==='modal')closeModal()};
+  load(); clearInterval(timer); timer=setInterval(()=>{if(cls&&$('modal').classList.contains('hide'))load()},REFRESH_MS);
+}
+try{const sp=sessionStorage.getItem('sel_pass');if(sp){PASS=sp;get({action:'login'}).then(r=>{if(r.ok){ACCESS=r;start()}}).catch(()=>{})}}catch(e){}
+
+/* 今日 / 趨勢統計 切換 */
+let view='today', sDays=7;
+$('viewTabs').onclick=e=>{const b=e.target.closest('button');if(!b)return;view=b.dataset.v;
+  document.querySelectorAll('#viewTabs button').forEach(x=>x.classList.toggle('on',x===b));load()};
+async function loadStats(){
+  if(DEMO){$('statsView').innerHTML='<div class="mute">展示模式不提供統計，部署 Apps Script 後即可使用。</div>';return}
+  $('statsView').innerHTML=SELStats.tabs(sDays)+'<div class="mute">統計中…</div>';
+  try{
+    const d=await get({action:'stats',cls,days:sDays});
+    if(!d.ok)throw new Error(d.error);
+    $('statsView').innerHTML=SELStats.tabs(sDays)+SELStats.html(d,{showCls:false});
+  }catch(e){$('statsView').innerHTML=SELStats.tabs(sDays)+'<div class="mute">載入失敗：'+esc(e.message)+'</div>'}
+}
+$('statsView').onclick=e=>{const b=e.target.closest('.st-tabs button');if(b){sDays=+b.dataset.days;loadStats()}};
+async function load(){
+  $('todayView').classList.toggle('hide',view!=='today');$('statsView').classList.toggle('hide',view!=='stats');
+  cls=$('clsSel').value;
+  if(!cls){$('grid').innerHTML='<div class="mute">請選擇班級</div>';$('stats').innerHTML='';$('alerts').innerHTML='';return}
+  store.set('sel_teacher_class',cls);
+  if(view==='stats'){loadStats();return}
+  $('meta').textContent='載入中…';
+  try{
+    const r=await get({action:'today',cls,date:$('date').value});
+    if(!r.ok) throw new Error(r.error);
+    data=r;
+  }catch(e){ $('meta').textContent='載入失敗：'+e.message; return }
+  render();
+}
+
+/* 每位學生取當日最新一筆；整合名單，未簽到者列出 */
+const PER={ci:'👋 Check-in',co:'🏁 Check-out'};
+const CHG_ZH={improved:'好轉',same:'持平',shifted:'轉換',worsened:'轉差'};
+const CHG_ICON={improved:'↑',same:'＝',shifted:'⇄',worsened:'↓'};
+const changeKind=(a,b)=>a===b?'same':b==='green'?'improved':a==='green'?'worsened':'shifted';
+const dotHtml=c=>`<span style="display:inline-block;width:20px;height:20px;border-radius:50%;background:${({red:'#e5484d',blue:'#3b82f6',yellow:'#f5b301',green:'#2fa86b'})[c]||'#cbd5e1'}"></span>`;
+const mini=(rec,size)=>rec?(SELFaces.svg(rec.emotion||'',size||26)||dotHtml(rec.color)):'<span class="mute">—</span>';
+function latest(){
+  const m={},byK={};
+  data.checkins.forEach(c=>{
+    if(!m[c.seat]||String(c.time)>=String(m[c.seat].time)) m[c.seat]=c;                 // 目前（最新）狀態
+    const p=c.kind||'ci', k=c.seat+'|'+p;
+    if(!byK[k]||String(c.time)>=String(byK[k].time)) byK[k]=c;                         // Check-in／Check-out 各自最新一筆
+  });
+  const seats=new Set([...data.roster.map(r=>r.seat),...Object.keys(m).map(Number)]);
+  const fu={}; data.followups.forEach(f=>{fu[f.seat]=f});
+  return [...seats].sort((a,b)=>a-b).map(seat=>{
+    const r=data.roster.find(x=>x.seat===seat), c=m[seat], ci=byK[seat+'|ci'], co=byK[seat+'|co'];
+    const pr=c?COLOR[c.color].p:-1;
+    return {seat,name:(r&&r.name)||(c&&c.name)||'',avatar:(r&&r.avatar)||'',c,ci,co,change:(ci&&co)?changeKind(ci.color,co.color):'',pr,fu:fu[seat]};
+  });
+}
+function render(){
+  const L=latest();
+  const cnt={red:0,blue:0,yellow:0,green:0,none:0};
+  L.forEach(s=>{cnt[s.c?s.c.color:'none']++});
+  const chip=(k,label,n)=>`<div class="chip ${k} ${filter===k?'on':''}" data-f="${k}"><b>${n}</b>${label}</div>`;
+  $('stats').innerHTML=chip('all','全部',L.length)+chip('red','🔴 生氣',cnt.red)+chip('blue','🔵 沮喪',cnt.blue)+chip('yellow','🟡 焦慮',cnt.yellow)+chip('green','🟢 平和',cnt.green)+chip('none','⚪ 未簽到',cnt.none);
+  $('stats').onclick=e=>{const c=e.target.closest('.chip');if(c){filter=c.dataset.f;render()}};
+  const urgent=L.filter(s=>s.c&&(s.c.color==='red'||(s.c.color==='blue'&&s.c.note))&&!s.fu);
+  $('alerts').innerHTML=urgent.length?`<div class="alert">🚨 <b>優先關心（尚未處遇）：</b>${urgent.map(s=>esc(s.seat+'號'+s.name)).join('、')}</div>`:'';
+  // 今日心情變化（Check-in → Check-out）
+  const both=L.filter(s=>s.change), kc={improved:0,same:0,shifted:0,worsened:0}; both.forEach(s=>kc[s.change]++);
+  const ciN=L.filter(s=>s.ci).length, coN=L.filter(s=>s.co).length;
+  const moved=both.filter(s=>s.change!=='same').sort((a,b)=>({worsened:0,shifted:1,improved:2})[a.change]-({worsened:0,shifted:1,improved:2})[b.change]);
+  $('changeBox').innerHTML=`<div class="cbox"><h4>🔄 今日心情變化（Check-in → Check-out）<span class="mute"> Check-in ${ciN} 人・Check-out ${coN} 人</span></h4>`+
+    (both.length?`<div class="sum">${['improved','same','shifted','worsened'].map(k=>`<span class="chg ${k}" style="font-size:13px;padding:3px 10px">${CHG_ZH[k]} ${kc[k]}</span>`).join('')}</div>`+
+      moved.map(s=>`<div class="row"><b>${SELAnimals.html(s.avatar,34)} ${s.seat}號 ${esc(s.name)}</b> 👋${mini(s.ci,24)} → 🏁${mini(s.co,24)} <span class="chg ${s.change}">${CHG_ZH[s.change]}${CHG_ICON[s.change]}</span></div>`).join('')
+      :'<div class="mute">還沒有同學完成 Check-in 和 Check-out，Check-out 後這裡會顯示心情變化。</div>')+'</div>';
+  $('meta').textContent=`${clsLabel(cls)} · ${$('date').value} · 已簽到 ${L.length-cnt.none}/${L.length} · 更新 ${new Date().toTimeString().slice(0,5)}`;
+  const shown=L.filter(s=>filter==='all'||(filter==='none'?!s.c:s.c&&s.c.color===filter))
+    .sort((a,b)=>filter==='all'?(b.pr-a.pr||a.seat-b.seat):a.seat-b.seat);
+  $('grid').innerHTML=shown.map(s=>{
+    const col=s.c?s.c.color:'';
+    return `<div class="s ${col} ${s.c&&s.c.color==='red'&&!s.fu?'urgent':''}" data-seat="${s.seat}">
+      ${s.c&&s.c.note?'<span class="badge">💬</span>':''}
+      <div class="top"><span>${SELAnimals.html(s.avatar,36)} ${s.seat}號</span><span>${esc(s.name)}</span></div>
+      ${s.c?`<div class="g">${COLOR[col].zh}</div><div class="pm2"><span title="Check-in">👋</span>${mini(s.ci)}<span class="arr">→</span><span title="Check-out">🏁</span>${mini(s.co)}${s.change?`<span class="chg ${s.change}">${CHG_ZH[s.change]}${CHG_ICON[s.change]}</span>`:''}</div>`:'<div class="g"><span class="mute">尚未簽到</span></div>'}
+      ${s.c&&s.c.note?`<div class="n">${esc(s.c.note)}</div>`:''}
+      ${s.fu?`<div class="st">✓ ${esc(s.fu.status)}</div>`:''}</div>`}).join('')||'<div class="mute">沒有符合的學生</div>';
+  $('grid').onclick=e=>{const c=e.target.closest('.s');if(c)openStudent(+c.dataset.seat)};
+}
+
+/* 學生詳情 + 處遇紀錄 */
+async function openStudent(seat){
+  const s=latest().find(x=>x.seat===seat);
+  showModal(`<h3>${seat}號 ${esc(s.name)}</h3><div class="mute">載入歷史中…</div>`);
+  let h={history:[],followups:[]};
+  try{h=await get({action:'history',cls,seat,days:14})}catch(e){}
+  const byDay={};(h.history||[]).forEach(x=>{byDay[x.date]=x});
+  const days=[...Array(14)].map((_,i)=>{const d=new Date();d.setDate(d.getDate()-13+i);return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')});
+  const notes=(h.history||[]).filter(x=>x.note).slice(-5).reverse();
+  showModal(`<h3>${seat}號 ${esc(s.name)}</h3>
+    ${['ci','co'].map(p=>{const x=s[p];return `<div style="margin-top:6px">${PER[p]}：${x?`<b>${COLOR[x.color].zh}</b> ${SELFaces.html(x.emotion||'',22)}`:'<span class="mute">尚未簽到</span>'}</div>${x&&x.note?`<div style="background:#f3f4f6;padding:8px;border-radius:8px;margin-top:4px">💬 ${esc(x.note)}</div>`:''}`}).join('')}
+    ${s.avatar?`<div style="margin-top:8px">代表圖案：<span style="font-size:26px">${SELAnimals.html(s.avatar,56)}</span> <button class="btn g" id="avReset" style="padding:4px 10px;font-size:13px">重設圖案</button> <span class="mute">重設後學生可以重新選一次</span></div>`:''}
+    ${s.change?`<div style="margin-top:8px">今日變化：<span class="chg ${s.change}" style="font-size:13px;padding:3px 10px">${CHG_ZH[s.change]}${CHG_ICON[s.change]}</span></div>`:''}
+    <p class="mute" style="margin:12px 0 0">近 14 天（舊→新，滑過可看日期）</p>
+    <div class="hist">${days.map(d=>`<div class="dot ${byDay[d]?byDay[d].color:''}" title="${d}">${d.slice(8)}</div>`).join('')}</div>
+    ${notes.length?'<div class="mute">近期留言</div>'+notes.map(n=>`<div class="log">${esc(n.date)}：${esc(n.note)}</div>`).join(''):''}
+    <hr style="border:0;border-top:1px solid var(--line);margin:12px 0">
+    <b>📝 新增處遇紀錄</b>
+    <select id="fuStatus">${FOLLOW_STATUS.map(x=>`<option>${x}</option>`).join('')}</select>
+    <textarea id="fuNote" rows="3" placeholder="處遇內容、與學生的對話、後續計畫…"></textarea>
+    <input id="fuTeacher" placeholder="教師姓名" value="${esc(store.get('sel_teacher_name','')||(ACCESS&&ACCESS.name)||'')}">
+    <div style="display:flex;gap:8px;margin-top:6px"><button class="btn" id="fuSave">儲存</button><button class="btn g" onclick="closeModal()">關閉</button></div>
+    ${(h.followups||[]).length?'<div class="mute" style="margin-top:12px">過往處遇</div>'+h.followups.slice(-5).reverse().map(f=>`<div class="log"><b>${esc(f.status)}</b> ${esc(f.time)} ${esc(f.teacher)}<br>${esc(f.note)}</div>`).join(''):''}`);
+  if($('avReset'))$('avReset').onclick=async()=>{if(!confirm('重設後，這位同學可以重新選一次圖案（只能再選一次，選了就固定）。確定嗎？'))return;const r=await post({action:'clearAvatar',cls,seat});if(r.ok){closeModal();load()}else alert('重設失敗')};
+  $('fuSave').onclick=async()=>{
+    const t=$('fuTeacher').value.trim(); store.set('sel_teacher_name',t);
+    $('fuSave').disabled=true;
+    const r=await post({action:'followup',cls,seat,name:s.name,status:$('fuStatus').value,note:$('fuNote').value.trim(),teacher:t});
+    if(r.ok){closeModal();load()}else{alert('儲存失敗');$('fuSave').disabled=false}
+  };
+}
+function showModal(h){$('modalBody').innerHTML=h;$('modal').classList.remove('hide')}
+function closeModal(){$('modal').classList.add('hide')}
+
+/* 班級名單 */
+function rosterEditor(){
+  if(!cls){alert('請先選班級');return}
+  showModal(`<h3>${clsLabel(cls)}名單</h3><div class="mute">每行一位：座號 姓名（例：1 王小明）。學生簽到時會自動帶出姓名，只能選名單內的座號。</div>
+    <textarea class="roster" id="rosterTxt">${esc(data.roster.sort((a,b)=>a.seat-b.seat).map(r=>r.seat+' '+r.name).join('\n'))}</textarea>
+    <div style="display:flex;gap:8px"><button class="btn" id="rsSave">儲存名單</button><button class="btn g" onclick="closeModal()">取消</button></div>`);
+  $('rsSave').onclick=async()=>{
+    const roster=$('rosterTxt').value.split('\n').map(l=>l.trim().match(/^(\d+)[\s,，、]+(.+)$/)).filter(Boolean).map(m=>({seat:+m[1],name:m[2].trim()}));
+    if(!roster.length&&!confirm('名單是空的，確定要清空嗎？'))return;
+    const r=await post({action:'saveRoster',cls,roster});
+    if(r.ok){closeModal();load()}else alert('儲存失敗');
+  };
+}
+function exportCsv(){
+  const rows=[['班級','日期','座號','姓名','Check-in 顏色','Check-in 情緒','Check-out 顏色','Check-out 情緒','當天變化','備註（最新）','處遇狀態']];
+  latest().forEach(s=>rows.push([cls,$('date').value,s.seat,s.name,s.ci?COLOR[s.ci.color].zh:'未簽到',s.ci?(s.ci.emotion||''):'',s.co?COLOR[s.co.color].zh:'未簽到',s.co?(s.co.emotion||''):'',s.change?CHG_ZH[s.change]:'',s.c?s.c.note:'',s.fu?s.fu.status:'']));
+  const csv='﻿'+rows.map(r=>r.map(v=>'"'+String(v??'').replace(/"/g,'""')+'"').join(',')).join('\n');
+  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));a.download=`SEL_${cls}_${$('date').value}.csv`;a.click();
+}
+</script>
+</body>
+</html>

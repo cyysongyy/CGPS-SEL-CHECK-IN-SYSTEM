@@ -1,0 +1,480 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>我的心情簽到</title>
+<style>
+:root{
+  --red:#e5484d; --blue:#3b82f6; --yellow:#f5b301; --green:#2fa86b;
+  --ink:#1f2937; --mute:#6b7280; --page:#f7f7fb; --card:#fff; --line:#e5e7eb; --pri:#4f46e5;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{margin:0;font-family:"Noto Sans TC","PingFang TC","Microsoft JhengHei",system-ui,sans-serif;background:var(--page);color:var(--ink);font-size:18px;transition:background .3s}
+.wrap{max-width:640px;margin:0 auto;padding:16px 16px 40px}
+h1{font-size:24px;margin:8px 0 2px;text-align:center}
+.sub{text-align:center;color:var(--mute);font-size:15px;margin-bottom:14px}
+.card{background:var(--card);border-radius:18px;padding:16px;margin-bottom:14px;box-shadow:0 2px 8px rgba(0,0,0,.06)}
+.step{font-weight:700;margin:0 0 10px;font-size:18px}
+.step span{display:inline-block;background:var(--pri);color:#fff;border-radius:50%;width:26px;height:26px;text-align:center;line-height:26px;font-size:15px;margin-right:6px}
+select,textarea{width:100%;font-size:18px;padding:12px;border:2px solid var(--line);border-radius:12px;background:#fff;font-family:inherit}
+.row{display:flex;gap:10px}.row>*{flex:1}
+/* 班級座號圖卡 */
+.tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:10px}
+.tile{display:flex;flex-direction:column;align-items:center;justify-content:flex-start;position:relative;border:3px solid var(--line);background:#fff;border-radius:16px;padding:10px 4px;text-align:center;cursor:pointer;font-family:inherit;color:var(--ink)}
+.tile .no{display:block;font-size:28px;font-weight:800;color:var(--pri);line-height:1.1}
+.tile .nm{display:block;font-size:16px;margin-top:2px}
+.tile.sel{border-color:var(--pri);background:#eef2ff;transform:scale(1.04)}
+.tile .dn{position:absolute;left:0;right:0;bottom:-1px;font-size:11px;color:#047857;background:#d1fae5;border-radius:0 0 12px 12px;padding:1px 0}
+.tile.done{padding-bottom:20px}
+.tile .av{display:flex;width:70px;height:70px;margin:6px auto 0;border-radius:50%;align-items:center;justify-content:center;font-size:29px;line-height:1;background:var(--abg,#FFF4C7)}
+.tile .av.ph{background:transparent;border:2px dashed #cbd5e1;color:#94a3b8;font-size:22px}
+.tile .av svg,.avc svg,.agrid button svg{width:96%;height:96%}
+.aconf .big svg{width:96%;height:96%}
+.avc{display:inline-flex;width:52px;height:52px;border-radius:50%;align-items:center;justify-content:center;font-size:21px;vertical-align:middle;background:var(--abg,#FFF4C7)}
+.tile .no{font-size:20px}
+.apick{background:#fff8e5;border-radius:14px;padding:10px;margin-top:10px}
+.agrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(68px,1fr));gap:8px;margin-top:8px}
+.agrid button{font-size:30px;line-height:1;background:var(--abg,#fff);border:3px solid transparent;border-radius:50%;aspect-ratio:1;display:flex;align-items:center;justify-content:center;padding:0;cursor:pointer}
+.agrid button.sel{border-color:var(--pri)}
+.apick{position:relative}
+.aconf{position:absolute;inset:0;background:rgba(255,255,255,.97);border-radius:14px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;text-align:center;z-index:2;padding:12px}
+.aconf .big{font-size:76px;width:176px;height:176px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:var(--abg,#FFF4C7)}
+.aconf b{font-size:20px}.aconf small{color:#b45309;font-weight:700;font-size:15px}
+.aconf .acrow{display:flex;gap:12px}
+.aconf button{font-family:inherit;font-size:18px;font-weight:700;border-radius:14px;padding:12px 22px;border:0;cursor:pointer}
+.aconf .ok{background:var(--pri);color:#fff}.aconf .no2{background:#e5e7eb;color:#374151}
+.agrid button.taken{opacity:.22;filter:grayscale(1);cursor:not-allowed}
+.hello{font-size:20px;font-weight:700;text-align:center;color:var(--pri);min-height:28px;margin-top:10px}
+/* 情緒卡片：柔和粉彩＋向量臉譜（faces.js） */
+.egrid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.ecard{position:relative;display:flex;align-items:center;gap:8px;text-align:left;border:3px solid transparent;border-radius:20px;padding:11px 8px;background:var(--bg);cursor:pointer;font-family:inherit;transition:transform .12s,box-shadow .12s}
+.ecard b{display:block;font-size:17px;color:var(--fg);line-height:1.25;white-space:nowrap}
+.ecard small{display:block;font-size:12px;color:var(--fg);opacity:.85;line-height:1.35;margin-top:2px}
+.ecard.sel{border-color:var(--st);box-shadow:0 5px 16px rgba(0,0,0,.14);transform:scale(1.025)}
+.ecard.sel::after{content:"✓";position:absolute;top:-8px;right:-6px;width:24px;height:24px;border-radius:50%;background:var(--st);color:#fff;font-size:14px;line-height:24px;text-align:center;font-weight:700}
+.ecard.dim{opacity:.72}
+.egrid.big .ecard{flex-direction:column;text-align:center;padding:16px 8px 14px;gap:6px}
+.egrid.big .ecard b{font-size:21px}
+.egrid.big .ecard small{font-size:13.5px}
+.egrid.compact{grid-template-columns:repeat(4,1fr);gap:6px}
+.egrid.compact .ecard{flex-direction:column;text-align:center;padding:9px 2px 8px;gap:3px;border-radius:16px}
+.egrid.compact .ecard b{font-size:13.5px;letter-spacing:-.3px}
+.egrid.compact .ecard small{display:none}
+.egrid.compact .ecard.sel::after{top:-7px;right:-5px;width:20px;height:20px;line-height:20px;font-size:12px}
+.tier{grid-column:1/-1;text-align:center;font-size:13px;color:var(--mute);margin:8px 0 0}
+.egrid-note{text-align:center;color:var(--mute);font-size:13px;margin-top:12px}
+.bigface{display:flex;justify-content:center}
+textarea{resize:vertical}
+.go{width:100%;background:var(--pri);color:#fff;border:0;border-radius:16px;padding:16px;font-size:20px;font-weight:700;cursor:pointer;font-family:inherit}
+.go:disabled{background:#c7c9d6}
+.phint{border-radius:14px;padding:9px 12px;margin:0 0 12px;font-size:15px;font-weight:700;text-align:center;background:#fff;color:var(--pri);box-shadow:0 2px 8px rgba(0,0,0,.06)}
+/* 大螢幕（教室白板／投影）：座號在左、心情卡片緊鄰在右，一個接一個點選 */
+.cols{display:block}
+.apx{display:none}
+.toast{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:50;background:#fff;border-radius:28px;padding:26px 44px;text-align:center;min-width:420px;max-width:80vw;box-shadow:0 0 0 100vmax rgba(0,0,0,.38),0 24px 70px rgba(0,0,0,.35);cursor:pointer}
+.toast h2{margin:8px 0 4px;font-size:32px}.toast p{margin:4px 0;font-size:20px;color:var(--mute)}.toast .after{color:var(--pri);font-weight:700}
+body.board .wrap{max-width:1600px;padding:16px 28px 28px}
+body.board h1{font-size:36px;margin:2px 0 0}
+body.board .sub{font-size:18px;margin-bottom:10px}
+body.board .cols{display:grid;grid-template-columns:minmax(320px,29%) 1fr;gap:20px;align-items:start}
+body.board .colL{position:sticky;top:10px;z-index:30}   /* 左欄自成一層，選動物視窗才不會被右邊的心情卡片蓋住 */
+body.board .colL .card,body.board .colR .card{margin-bottom:14px}
+body.board .tiles{grid-template-columns:repeat(auto-fill,minmax(116px,1fr));gap:12px;max-height:calc(100vh - 250px);overflow:auto;padding:4px}
+body.board .tile{padding:14px 4px 10px}
+body.board .tile .no{font-size:40px}
+body.board .tile .nm{font-size:18px}
+body.board .tile .av{width:92px;height:92px;font-size:34px}
+body.board .avc{width:68px;height:68px}
+body.board .aconf .big{width:210px;height:210px}
+body.board .step{font-size:22px}
+body.board .phint{font-size:22px;padding:12px}
+body.board .egrid{grid-template-columns:repeat(4,1fr);gap:14px}
+body.board .egrid .ecard{flex-direction:column;text-align:center;padding:14px 6px 12px;gap:6px}
+body.board .egrid .ecard b{font-size:22px}
+body.board .egrid .ecard small,body.board .egrid.compact .ecard small{display:block;font-size:14px}
+body.board .egrid-note{display:none}
+body.board .sendRow{display:flex;gap:14px;align-items:stretch}
+body.board .sendRow .card{flex:1;margin:0}
+body.board .sendRow textarea{font-size:20px;padding:10px}
+body.board .sendRow .go{flex:0 0 310px;font-size:28px;margin:0;border-radius:22px}
+body.board .hello{font-size:26px}
+body.board .apick{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);width:min(940px,94vw);max-height:88vh;overflow:auto;z-index:40;margin:0;box-shadow:0 0 0 100vmax rgba(0,0,0,.45),0 24px 70px rgba(0,0,0,.4);border:3px solid #fff}
+body.board .apx{display:block;position:absolute;top:8px;right:12px;border:0;background:#fff;border-radius:50%;width:40px;height:40px;font-size:20px;cursor:pointer}
+body.board .agrid{grid-template-columns:repeat(auto-fill,minmax(104px,1fr));gap:12px}
+body.board .apick .sub{padding-right:52px}   /* 讓說明文字不被右上角的關閉鈕壓到 */
+/* 臉的大小隨螢幕高度縮放，讓卡片、座號、送出鈕都能在同一個畫面內 */
+body.board .egrid .ecard svg{width:var(--fs,70px);height:var(--fs,70px)}
+body.board .egrid.big{--fs:clamp(56px,13vh,120px)}
+body.board .egrid:not(.big):not(.compact){--fs:clamp(44px,9vh,80px)}
+body.board .egrid.compact{--fs:clamp(40px,7.2vh,70px)}
+@media (max-height:860px){
+  body.board .wrap{padding:8px 20px 10px}
+  body.board h1{font-size:26px}
+  body.board .sub{font-size:14px;margin-bottom:6px}
+  body.board .demo{display:none}
+  body.board .colL .card,body.board .colR .card{padding:10px 14px;margin-bottom:8px}
+  body.board .step{font-size:18px;margin-bottom:6px}
+  body.board .step span{width:24px;height:24px;line-height:24px;font-size:14px}
+  body.board .phint{font-size:17px;padding:6px;margin-bottom:8px}
+  body.board .hello{font-size:19px;margin-top:6px;min-height:22px}
+  body.board .tiles{grid-template-columns:repeat(auto-fill,minmax(86px,1fr));gap:8px;max-height:calc(100vh - 175px)}
+  body.board .tile{padding:8px 2px 6px}
+  body.board .tile .no{font-size:28px}
+  body.board .tile .nm{font-size:14px}
+  body.board .tile .av{width:64px;height:64px;font-size:24px;margin-top:3px}
+  body.board .avc{width:46px;height:46px}
+  body.board .agrid{grid-template-columns:repeat(auto-fill,minmax(82px,1fr));gap:8px}
+  body.board .aconf .big{width:150px;height:150px}
+  body.board .tile.done{padding-bottom:18px}
+  body.board .egrid{gap:8px}
+  body.board .egrid .ecard{padding:8px 4px;gap:3px;border-radius:16px}
+  body.board .egrid .ecard b{font-size:18px}
+  body.board .egrid .ecard small{font-size:12px}
+  body.board .egrid.compact .ecard small{display:none}
+  body.board .egrid-note{display:none}
+  body.board .tier{margin:0;font-size:12px}
+  body.board .sendRow .go{font-size:22px;flex-basis:230px}
+  body.board .sendRow textarea{height:52px;font-size:17px;padding:8px}
+}
+.done-view{text-align:center}
+.big{font-size:64px}
+.tips{text-align:left;margin:10px 0 0;padding-left:20px;line-height:1.7}
+.link{background:none;border:0;color:var(--pri);font-size:16px;cursor:pointer;text-decoration:underline;font-family:inherit}
+.hide{display:none}
+.demo{background:#fff7ed;color:#9a3412;border-radius:10px;padding:8px 12px;font-size:14px;margin-bottom:12px}
+.closed{background:#eef2ff;border-radius:14px;padding:20px;text-align:center}
+.err{color:#b91c1c;text-align:center;margin-top:8px;font-size:15px}
+.sigs{margin-top:14px;text-align:left}
+.sigs h3{font-size:16px;margin:0 0 8px;text-align:center}
+.sgrid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.sc{background:#fff8e5;border-radius:12px;padding:8px;font-size:13px;line-height:1.4}
+.sc:last-child{grid-column:1/-1}
+.sc img{display:block;width:100%;height:96px;object-fit:contain;background:#3f281f;border-radius:8px;margin-bottom:6px}
+.sc b{font-size:15px;display:block}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1 id="ttl">🌈 我的心情簽到</h1>
+  <div class="sub" id="today"></div>
+  <div class="demo hide" id="demo">⚠️ 目前為「展示模式」，資料只存在這台裝置。設定 GAS_URL 後才會傳給老師。</div>
+
+  <div id="closedView" class="closed hide">
+    <div class="big">🏡</div><h2>今天不是上課日</h2><p>上課日再來告訴老師你的心情吧！</p>
+  </div>
+
+  <div id="formView">
+    <div class="cols">
+      <div class="colL">
+    <div class="card">
+      <p class="step"><span>1</span><i id="stp1" style="font-style:normal">找到我的座號，點一下（只顯示座號，保護隱私）</i></p>
+      <div class="row" id="classRow">
+        <select id="grade" aria-label="年級"></select>
+        <select id="klass" aria-label="班級"></select>
+      </div>
+      <div style="height:10px"></div>
+      <div class="tiles" id="tiles"></div>
+      <div class="hello" id="hello"></div>
+      <div class="apick hide" id="apick"><button class="apx" id="apx" type="button" aria-label="關閉">✕</button><div class="sub" style="margin:0"><b>🎨 選一隻你喜歡的動物，代表自己！</b>（每個號碼只能選一次，選了就固定；每隻動物只能一位同學用，灰色的已被選走）</div><div class="agrid" id="agrid"></div><div class="aconf hide" id="aconf"></div></div>
+    </div>
+
+      </div>
+      <div class="colR">
+    <div class="card">
+      <p class="step"><span>2</span><i id="stp2" style="font-style:normal">此刻，我的心情是哪一個？</i></p>
+      <div class="phint" id="phint"></div>
+      <div id="emotions"></div>
+    </div>
+
+        <div class="sendRow">
+    <div class="card">
+      <p class="step"><span>3</span><i id="stp3" style="font-style:normal">想多說一點嗎？（可以不寫）</i></p>
+      <textarea id="note" rows="2" maxlength="120" placeholder="例如：和朋友吵架了……"></textarea>
+    </div>
+
+    <button class="go" id="send" disabled>送出心情 ✔</button>
+        </div>
+    <div class="err" id="err"></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast hide" role="status"></div>
+
+  <div id="doneView" class="card done-view hide">
+    <div class="bigface" id="dEmoji"></div>
+    <h2 id="dTitle" style="margin:6px 0"></h2>
+    <p id="dMsg" style="margin:0"></p>
+    <ul class="tips" id="dTips"></ul>
+    <div class="sigs"><h3>🌅 辰光五個手勢（全校共同訊號）</h3><div class="sgrid" id="dSig"></div></div>
+    <p style="color:var(--mute);font-size:15px">你的老師會看到你的簽到，謝謝你誠實說出感受 💛</p>
+    <button class="link" id="again">回到名單（換下一位同學）</button>
+  </div>
+</div>
+
+<script src="config.js"></script>
+<script src="faces.js"></script>
+<script src="animals.js"></script>
+<script>
+/* ========= 設定區（可依學校調整）========= */
+const GAS_URL = window.SEL_GAS_URL || 'YOUR_APPS_SCRIPT_WEB_APP_URL_HERE';   // 網址在 config.js 設定
+const GRADES = [1,2,3,4,5,6];
+const GRADE_ZH = ['','一','二','三','四','五','六'];
+const CLASS_NAMES = ['甲'];                  // 本校每年級只有「甲」班；有增班再加：['甲','乙']
+const SCHOOL_DAYS = [1,2,3,4,5];             // 週一到週五
+const HOLIDAYS = [];                         // 放假日，例如 '2026-12-25'
+
+/* 四個顏色（區）與緩和策略 */
+const COLORS = {
+  red:   {zh:'紅色', feel:'生氣',     emoji:'😠',
+          msg:'生氣是很正常的情緒，它在提醒你有事情讓你不舒服。',
+          tips:['做 5 次「汽球呼吸」：吸 4 秒、吐 6 秒','雙手用力握拳 5 秒，再慢慢放鬆','先離開現場喝口水，再決定要怎麼說','想找人聊聊，就告訴老師']},
+  blue:  {zh:'藍色', feel:'沮喪',     emoji:'😢',
+          msg:'難過、沮喪的時候，不用假裝沒事，你並不孤單。',
+          tips:['把手放在胸口，深呼吸 3 次','對自己說：「我現在很難過，這是可以的」','找一位信任的人聊聊或抱一抱','做一件讓自己舒服的小事（畫畫、聽音樂）']},
+  yellow:{zh:'黃色', feel:'焦慮',     emoji:'😰',
+          msg:'緊張、擔心是大腦在保護你，我們一起讓它慢下來。',
+          tips:['5-4-3-2-1：說出看到5樣、摸到4樣、聽到3樣東西','慢慢數到 10，再深呼吸','把擔心的事寫下來，交給老師一起想辦法','告訴自己：「一次只做一小步」']},
+  green: {zh:'綠色', feel:'平和快樂', emoji:'😊',
+          msg:'太棒了！記得感謝讓你開心的人事物。',
+          tips:['想一件今天讓你感恩的事','把好心情分享給身邊的同學','留意：是什麼讓你今天這麼好？']}
+};
+/* 情緒清單（堆疊）：tier 1＝低年級(1-2年級)；tier 2＝中年級加(3-4)；tier 3＝高年級再加(5-6)
+   1-2年級看到 4 種、3-4年級 8 種、5-6年級 12 種。名稱與表情可自行調整。 */
+const EMOTIONS = [
+  {tier:1,color:'red',   em:'😠',name:'生氣'},   {tier:1,color:'blue',  em:'😢',name:'沮喪'},
+  {tier:1,color:'yellow',em:'😰',name:'焦慮'},   {tier:1,color:'green', em:'😊',name:'平和快樂'},
+  {tier:2,color:'red',   em:'😤',name:'挫折'},   {tier:2,color:'blue',  em:'🥺',name:'孤單'},
+  {tier:2,color:'yellow',em:'😨',name:'害怕'},   {tier:2,color:'green', em:'🤩',name:'開心興奮'},
+  {tier:3,color:'red',   em:'😒',name:'嫉妒'},   {tier:3,color:'blue',  em:'😞',name:'失望'},
+  {tier:3,color:'yellow',em:'😣',name:'壓力大'}, {tier:3,color:'green', em:'😎',name:'自信自豪'}
+];
+/* 各年級的畫面風格：底色、主色、標題、步驟用語、卡片版型（big 大卡片／two 兩欄含描述／compact 三欄精簡） */
+const GRADE_STYLE = {
+  1:{page:'#FFF6E3',pri:'#E8800F',title:'🌱 {c}今天的心情',   s1:'點一下，找到你的號碼',   s2:'你現在的心情是哪一個？',   s3:'想說什麼嗎？（可以不寫）',   layout:'big'},
+  2:{page:'#EAF7EE',pri:'#2A9D62',title:'🌼 {c}心情小天地',s1:'點一下，找到你的號碼',   s2:'你現在的心情是哪一個？',   s3:'想告訴老師什麼嗎？（可以不寫）', layout:'big'},
+  3:{page:'#F7F7FB',pri:'#4F46E5',title:'🌈 {c}心情簽到',    s1:'找到我的座號，點一下',   s2:'此刻，我的心情是哪一個？', s3:'想多說一點嗎？（可以不寫）', layout:'two'},
+  4:{page:'#EAF3FF',pri:'#2F6FDB',title:'🌊 {c}心情簽到',    s1:'找到我的座號，點一下',   s2:'此刻，我的心情是哪一個？', s3:'想多說一點嗎？（可以不寫）', layout:'two'},
+  5:{page:'#F3EEFF',pri:'#7048C9',title:'✨ {c}心情 Check-in',s1:'選擇我的座號',           s2:'此刻的心情',               s3:'補充說明（選填）',           layout:'compact'},
+  6:{page:'#EDF1F6',pri:'#334155',title:'🧭 {c}心情 Check-in',s1:'選擇我的座號',           s2:'此刻的心情',               s3:'補充說明（選填）',           layout:'compact'}
+};
+/* Check-in／Check-out：不論時間，只看順序。學生當天「第一次送出＝Check-in」，「第二次送出＝Check-out」。
+   實際類型由後端依當天紀錄判定；這裡只是先預告，讓學生知道這次是哪一個。 */
+const KIND = {
+  ci:{icon:'👋',label:'Check-in', after:'等一下記得再來按 Check-out，告訴老師你的心情哦！'},
+  co:{icon:'🏁',label:'Check-out',after:'謝謝你，明天見！'}
+};
+// 這位學生今天已簽到幾次 → 下一次是哪一個
+function nextKind(){
+  if (!state.seat) return 'ci';
+  return (state.done.ci||[]).includes(state.seat) ? 'co' : 'ci';
+}
+function applyKind(){
+  const K = KIND[state.kind], st = GRADE_STYLE[state.grade] || GRADE_STYLE[3];
+  const bothDone = state.seat && (state.done.ci||[]).includes(state.seat) && (state.done.co||[]).includes(state.seat);
+  $('stp2').textContent = `${K.icon} ${K.label}：${st.s2}`;
+  $('send').textContent = `送出 ${K.label} ✔`;
+  $('phint').textContent = !state.seat ? '先點上面自己的號碼 👆'
+    : bothDone ? '今天已完成 Check-in 和 Check-out，再送出會更新 Check-out'
+    : state.kind==='ci' ? '👋 今天第一次：Check-in'
+    : '🏁 今天第二次：Check-out';
+}
+/* 大螢幕模式：寬度 ≥ 900px（或網址加 ?board=1）自動啟用 */
+const BOARD = () => document.body.classList.contains('board');
+function updateBoard(){
+  const on = window.matchMedia('(min-width: 900px)').matches || new URLSearchParams(location.search).get('board')==='1';
+  document.body.classList.toggle('board', on);
+}
+function applyStyle(g){
+  const st = GRADE_STYLE[g] || GRADE_STYLE[3], root = document.documentElement.style;
+  root.setProperty('--page', st.page); root.setProperty('--pri', st.pri);
+  // 標題帶入班級：{c} → 例如「六甲」（年級中文 + 班名）
+  const cname = state.cls ? (GRADE_ZH[state.grade]||'') + state.cls.slice(String(state.grade).length) : '';
+  $('ttl').textContent = st.title.replace('{c}', cname);
+  document.title = cname ? `${cname}心情 Check-in` : '我的心情簽到';
+   $('stp1').textContent = st.s1; $('stp3').textContent = st.s3;
+  applyKind();
+}
+const tierOf = g => g<=2 ? 1 : g<=4 ? 2 : 3;
+
+/* 自我圖式：學生自選的代表圖案 */
+const AVATARS = SELAnimals.LIST;   // 30 種動物（animals.js）；學生選的代號仍存成 emoji（例如 🐶）
+
+const ABG = ['#FFE3E0','#E3EDFF','#FFF4C7','#E4F8EB','#F1E4FF','#FFE8D1'];   // 頭像底圈的柔和色
+const abg = (i) => ABG[(i||0) % ABG.length];
+
+/* 辰光五手勢（全校共同訊號，圖片放在 img/） */
+const SIGNALS = [
+  {img:'img/sig1.webp', name:'安靜手勢',   use:'看到這個手勢，全班停下聲音並看向老師。'},
+  {img:'img/sig2.webp', name:'我有話要說', use:'想發言或需要告訴老師事情時使用。'},
+  {img:'img/sig3.webp', name:'BTT',        use:'看到危險或不適當行為：退一步、想一想、告訴大人。'},
+  {img:'img/sig4.webp', name:'看著我',     use:'老師說 Eyes on me，你回 Eyes on you。'},
+  {img:'img/sig5.webp', name:'靜坐思考',   use:'需要安定心情時，安靜坐好。'}
+];
+/* ====================================== */
+
+const $ = id => document.getElementById(id);
+const DEMO = GAS_URL.startsWith('YOUR_');
+const pad = n => String(n).padStart(2,'0');
+const todayStr = () => { const d=new Date(); return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate()); };
+const esc = s => String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const store = { get(k,d){ try{ return JSON.parse(localStorage.getItem(k))??d }catch(e){ return d } }, set(k,v){ try{ localStorage.setItem(k,JSON.stringify(v)) }catch(e){} } };
+
+async function api(action, data){
+  if (DEMO) {                       // 展示模式：存在本機
+    if (action==='roster'){
+      const today = store.get('sel_demo_checkins',[]).filter(c=>c.cls===data.cls&&c.date===todayStr());
+      const done = {ci:today.filter(c=>c.kind==='ci').map(c=>c.seat), co:today.filter(c=>c.kind==='co').map(c=>c.seat)};
+      return {ok:true, roster: store.get('sel_roster_'+data.cls, []).map(r=>({seat:r.seat,avatar:r.avatar||''})), done};
+    }
+    if (action==='setAvatar'){ const k='sel_roster_'+data.cls, a=store.get(k,[]); if(a.some(x=>x.seat!==data.seat&&x.avatar===data.avatar)) return {ok:false,error:'taken'}; const r=a.find(x=>x.seat===data.seat); if(r&&r.avatar) return r.avatar===data.avatar?{ok:true}:{ok:false,error:'locked'}; if(r) r.avatar=data.avatar; store.set(k,a); return {ok:true}; }
+    if (action==='checkin'){ const a=store.get('sel_demo_checkins',[]); const d=new Date();
+      const seen=a.filter(c=>c.cls===data.cls&&c.seat===data.seat&&c.date===todayStr()).length;   // 當天第一次＝Check-in，之後＝Check-out
+      a.push({...data, kind:seen===0?'ci':'co', date:todayStr(), time:d.toTimeString().slice(0,8)}); store.set('sel_demo_checkins',a); return {ok:true, kind:seen===0?'ci':'co'}; }
+  }
+  if (action==='roster'){
+    const r = await fetch(GAS_URL+'?action=roster&cls='+encodeURIComponent(data.cls)); return r.json();
+  }
+  const r = await fetch(GAS_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action,...data})});
+  return r.json();
+}
+
+let state = {cls:'', grade:0, seat:null, emo:null, roster:[], done:{ci:[],co:[]}, kind:'ci'};
+const doneOf = d => Array.isArray(d) ? {ci:d,co:[]} : (d||{ci:[],co:[]});   // 相容舊版後端
+
+function isSchoolDay(){
+  const d=new Date();
+  return SCHOOL_DAYS.includes(d.getDay()) && !HOLIDAYS.includes(todayStr());
+}
+
+function init(){
+  $('today').textContent = new Date().toLocaleDateString('zh-TW',{year:'numeric',month:'long',day:'numeric',weekday:'long'});
+  if (DEMO) $('demo').classList.remove('hide');
+  if (!isSchoolDay()){ $('formView').classList.add('hide'); $('closedView').classList.remove('hide'); return; }
+
+  $('grade').innerHTML = '<option value="">年級</option>'+GRADES.map(g=>`<option value="${g}">${GRADE_ZH[g]}年級</option>`).join('');
+  $('klass').innerHTML = CLASS_NAMES.map(c=>`<option value="${c}">${c}班</option>`).join('');
+  if (CLASS_NAMES.length===1) $('klass').classList.add('hide');
+
+  // 班級 QR：?c=3甲（三年甲班）。沒帶參數時讓學生自己選，並記住上次的班級
+  const qc = new URLSearchParams(location.search).get('c');
+  const cls = qc || store.get('sel_class','');
+  const m = /^([1-6])(.+)$/.exec(cls||'');
+  if (m){ $('grade').value=m[1]; if (CLASS_NAMES.includes(m[2])) $('klass').value=m[2]; }
+  if (qc && m) $('classRow').classList.add('hide');
+  $('grade').onchange = $('klass').onchange = loadClass;
+  $('apx').onclick = () => $('apick').classList.add('hide');
+  updateBoard();
+  window.addEventListener('resize', () => { const was=BOARD(); updateBoard(); if (was!==BOARD()){ renderEmotions(); renderTiles(); if(state.seat) showHello(); } });
+  $('send').onclick = submit;
+  $('again').onclick = backToList;
+  loadClass();
+}
+
+async function loadClass(){
+  const g=$('grade').value, k=$('klass').value;
+  state.grade = +g||0; state.cls = (g&&k) ? g+k : '';
+  state.roster=[]; state.done={ci:[],co:[]}; state.seat=null; state.emo=null; state.kind='ci'; $('hello').textContent='';
+  applyStyle(state.grade); renderEmotions();
+  if (!state.cls){ $('tiles').innerHTML='<div class="sub">請先選年級</div>'; check(); return; }
+  store.set('sel_class',state.cls);
+  $('tiles').innerHTML='<div class="sub">載入中…</div>';
+  try{ const r = await api('roster',{cls:state.cls}); state.roster=(r.roster||[]).sort((a,b)=>a.seat-b.seat); state.done=doneOf(r.done); }catch(e){}
+  renderTiles(); check();
+}
+function renderTiles(){
+  if (!state.roster.length){ $('tiles').innerHTML='<div class="sub">這個班級還沒有名單，請老師先匯入。</div>'; return; }
+  $('tiles').innerHTML = state.roster.map(r=>
+    `<button class="tile ${(state.done.ci||[]).includes(r.seat)||(state.done.co||[]).includes(r.seat)?'done':''} ${state.seat===r.seat?'sel':''}" data-s="${r.seat}"><span class="no">${r.seat}</span><span class="nm">號</span>${r.avatar?`<span class="av" style="--abg:${abg(r.seat)}">${SELAnimals.html(r.avatar,66)}</span>`:'<span class="av ph">＋</span>'}${(state.done.co||[]).includes(r.seat)?'<span class="dn">✓✓ 今日完成</span>':(state.done.ci||[]).includes(r.seat)?'<span class="dn">✓ 已Check-in</span>':''}</button>`).join('');
+  $('tiles').onclick = e => { const b=e.target.closest('.tile'); if(!b) return;
+    state.seat=+b.dataset.s; state.kind=nextKind(); applyKind();
+    showHello(); renderTiles(); if(!BOARD()) $('emotions').scrollIntoView({behavior:'smooth',block:'nearest'}); check(); };
+}
+function showHello(){
+  const me = state.roster.find(r=>r.seat===state.seat)||{};
+  $('hello').innerHTML = `${me.avatar?`<span class="avc" style="--abg:${abg(me.seat)}">${SELAnimals.html(me.avatar,44)}</span> `:''}你選了 ${state.seat} 號 ` + ((!me.avatar&&BOARD())?`<button class="link" id="chAv">🎨 選動物（只能選一次）</button>`:'');
+  const needPick = !me.avatar && !BOARD();   // 大螢幕不打斷流程，想選圖案再按按鈕
+  $('apick').classList.toggle('hide', !needPick);
+  if (needPick) renderAvatars();
+  const b=$('chAv'); if (b) b.onclick=()=>{ $('apick').classList.toggle('hide'); renderAvatars(); };
+}
+function renderAvatars(){
+  const me = state.roster.find(r=>r.seat===state.seat)||{};
+  if (me.avatar) { $('apick').classList.add('hide'); return; }          // 已選過：固定，不能再換
+  $('aconf').classList.add('hide');
+  // 同班同學已選走的圖案：變灰、不能再選（每個圖案只能一人使用）
+  const taken = new Set(state.roster.filter(r=>r.seat!==state.seat && r.avatar).map(r=>r.avatar));
+  $('agrid').innerHTML = AVATARS.map((a,i)=> taken.has(a)
+    ? `<button disabled class="taken" title="${SELAnimals.NAME[a]}（已被同學選走）" style="--abg:${abg(i)}">${SELAnimals.svg(a,64)}</button>`
+    : `<button data-a="${a}" title="${SELAnimals.NAME[a]}" aria-label="${SELAnimals.NAME[a]}" style="--abg:${abg(i)}">${SELAnimals.svg(a,64)}</button>`).join('');
+  // 點選後先確認，因為只能選一次、選了就固定
+  $('agrid').onclick = e => { const b=e.target.closest('button'); if(!b||b.disabled) return;
+    const av=b.dataset.a, seat=state.seat, i=AVATARS.indexOf(av);
+    $('aconf').innerHTML = `<div class="big" style="--abg:${abg(i)}">${SELAnimals.svg(av,168)}</div><b>確定選「${SELAnimals.NAME[av]}」嗎？</b><small>⚠️ 每個號碼只能選一次，選了就固定，不能再換囉！</small><div class="acrow"><button class="no2" id="acNo">再想想</button><button class="ok" id="acOk">確定 ✔</button></div>`;
+    $('aconf').classList.remove('hide');
+    $('acNo').onclick = () => $('aconf').classList.add('hide');
+    $('acOk').onclick = async () => { $('acOk').disabled = true; $('err').textContent='';
+      try{ const r = await api('setAvatar',{cls:state.cls, seat, avatar:av});
+        if (r.error==='taken' || r.error==='locked'){   // 被同學搶先選走，或這個號碼已經選過：更新名單
+          $('err').textContent = r.error==='taken' ? '這隻動物剛剛被同學選走了，請換一隻。' : '這個號碼已經選過動物了，已固定。';
+          const fresh = await api('roster',{cls:state.cls}); state.roster=(fresh.roster||[]).sort((a,b)=>a.seat-b.seat); state.done=doneOf(fresh.done);
+          renderTiles(); if(state.seat) showHello(); return; }
+        if(!r.ok) throw 0;
+        me.avatar=av; $('apick').classList.add('hide'); showHello(); renderTiles();
+      }catch(err){ $('err').textContent='圖案儲存失敗，請再試一次。'; $('aconf').classList.add('hide'); } };
+  };
+}
+function renderEmotions(){
+  if (!state.grade){ $('emotions').innerHTML='<div class="sub">先選好年級</div>'; return; }
+  const t = tierOf(state.grade), label = {2:'再多一點的心情', 3:'更細緻的心情'}, layout = (GRADE_STYLE[state.grade]||{}).layout || 'two';
+  const card = e => { const z=SELFaces.ZONE[e.color], f=SELFaces.FACES[e.name];
+    return `<button class="ecard" data-n="${e.name}" style="--bg:${z.card};--fg:${z.text};--st:${z.stroke}">${SELFaces.svg(e.name,BOARD()?(layout==='big'?112:layout==='compact'?68:78):(layout==='big'?84:layout==='compact'?46:52))}<span><b>${e.name}</b><small>${f.desc}</small></span></button>`; };
+  let h='';
+  for (let k=1;k<=t;k++){ if (label[k]) h+=`<div class="tier">${label[k]}</div>`; h+=EMOTIONS.filter(e=>e.tier===k).map(card).join(''); }
+  $('emotions').innerHTML = `<div class="egrid ${layout==='big'?'big':layout==='compact'?'compact':''}">${h}</div><div class="egrid-note">每一種心情，都可以在這裡安心停留。</div>`;
+  $('emotions').onclick = e => { const b=e.target.closest('.ecard'); if(!b) return;
+    state.emo = EMOTIONS.find(x=>x.name===b.dataset.n);
+    document.querySelectorAll('.ecard').forEach(x=>{x.classList.toggle('sel',x===b); x.classList.toggle('dim',x!==b);}); check(); };
+}
+function check(){ $('send').disabled = !(state.cls && state.seat && state.emo); }
+let toastTimer=null;
+function showToast(e, c, per){
+  const K=KIND[per];
+  $('toast').innerHTML = `<div class="bigface">${SELFaces.svg(e.name,120)}</div><h2>${state.seat} 號　${K.icon} ${K.label} 完成！</h2><p>你選了「${e.name}」（${c.zh}・${c.feel}區）</p><p>${c.msg}</p><p class="after">${K.after}</p>`;
+  $('toast').classList.remove('hide');
+  const done = () => { clearTimeout(toastTimer); $('toast').classList.add('hide'); nextStudent(); };
+  $('toast').onclick = done; toastTimer = setTimeout(done, 3200);
+}
+// 回到初始狀態，讓下一位同學直接點座號
+function nextStudent(){
+  state.seat=null; state.emo=null; state.kind='ci'; $('note').value=''; $('hello').textContent=''; $('err').textContent='';
+  $('apick').classList.add('hide');
+  document.querySelectorAll('.ecard').forEach(x=>x.classList.remove('sel','dim'));
+  applyKind(); renderTiles(); check();
+}
+function backToList(){
+  $('doneView').classList.add('hide'); $('formView').classList.remove('hide');
+  loadClass(); window.scrollTo(0,0);
+}
+async function submit(){
+  $('send').disabled = true; $('err').textContent='';
+  try{
+    const e = state.emo;
+    const r = await api('checkin',{cls:state.cls, seat:state.seat, color:e.color, emotion:e.em+' '+e.name, note:$('note').value.trim()});
+    if (!r.ok) throw new Error(r.error||'fail');
+    $('note').value='';
+    const per = r.kind || state.kind;   // 以後端判定為準（當天第一次＝Check-in，第二次起＝Check-out）
+    (state.done[per] = state.done[per]||[]).includes(state.seat) || state.done[per].push(state.seat);
+    const c = COLORS[e.color];
+    $('dEmoji').innerHTML=SELFaces.svg(e.name,110); $('dTitle').textContent=`${KIND[per].icon} ${KIND[per].label}：「${e.name}」（${c.zh}・${c.feel}區）`; $('dMsg').textContent=c.msg;
+    $('dTips').innerHTML = c.tips.map(t=>`<li>${t}</li>`).join('') + `<li style="list-style:none;margin-top:6px;color:var(--pri);font-weight:700">${KIND[per].after}</li>`;
+    $('dSig').innerHTML = SIGNALS.map((g,i)=>`<div class="sc"><img src="${g.img}" alt="${g.name}" loading="lazy"><b>${i+1}. ${g.name}</b>${g.use}</div>`).join('');
+    if (BOARD()){ showToast(e, c, per); return; }   // 大螢幕：短暫提示後自動換下一位，不切換頁面
+    $('formView').classList.add('hide'); $('doneView').classList.remove('hide'); window.scrollTo(0,0);
+  }catch(e){ $('err').textContent='送出失敗，請檢查網路後再試一次。'; check(); }
+}
+init();
+</script>
+</body>
+</html>
