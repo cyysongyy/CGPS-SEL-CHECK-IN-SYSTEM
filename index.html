@@ -69,74 +69,50 @@ textarea{resize:vertical}
 .go{width:100%;background:var(--pri);color:#fff;border:0;border-radius:16px;padding:16px;font-size:20px;font-weight:700;cursor:pointer;font-family:inherit}
 .go:disabled{background:#c7c9d6}
 .phint{border-radius:14px;padding:9px 12px;margin:0 0 12px;font-size:15px;font-weight:700;text-align:center;background:#fff;color:var(--pri);box-shadow:0 2px 8px rgba(0,0,0,.06)}
-/* 大螢幕（教室白板／投影）：座號在左、心情卡片緊鄰在右，一個接一個點選 */
+/* 大螢幕（教室白板／投影）：座號在左、心情卡片緊鄰在右，一個接一個點選。
+   所有尺寸都乘上 --bs（由 JS 依「目前視窗高度」自動調整），確保整個畫面不用捲動。 */
 .cols{display:block}
 .apx{display:none}
 .toast{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:50;background:#fff;border-radius:28px;padding:26px 44px;text-align:center;min-width:420px;max-width:80vw;box-shadow:0 0 0 100vmax rgba(0,0,0,.38),0 24px 70px rgba(0,0,0,.35);cursor:pointer}
 .toast h2{margin:8px 0 4px;font-size:32px}.toast p{margin:4px 0;font-size:20px;color:var(--mute)}.toast .after{color:var(--pri);font-weight:700}
-body.board .wrap{max-width:1600px;padding:16px 28px 28px}
-body.board h1{font-size:36px;margin:2px 0 0}
-body.board .sub{font-size:18px;margin-bottom:10px}
-body.board .cols{display:grid;grid-template-columns:minmax(320px,29%) 1fr;gap:20px;align-items:start}
+body.board .wrap{max-width:1700px;padding:calc(14px*var(--bs,1)) 28px calc(16px*var(--bs,1))}
+body.board h1{font-size:calc(36px*var(--bs,1));margin:0}
+body.board .sub{font-size:calc(18px*var(--bs,1));margin-bottom:calc(8px*var(--bs,1))}
+body.board .demo{padding:calc(4px*var(--bs,1)) 12px;font-size:calc(13px*var(--bs,1));margin-bottom:calc(8px*var(--bs,1))}
+body.board .cols{display:grid;grid-template-columns:minmax(330px,33%) 1fr;gap:20px;align-items:start}
 body.board .colL{position:sticky;top:10px;z-index:30}   /* 左欄自成一層，選動物視窗才不會被右邊的心情卡片蓋住 */
-body.board .colL .card,body.board .colR .card{margin-bottom:14px}
-body.board .tiles{grid-template-columns:repeat(auto-fill,minmax(116px,1fr));gap:12px;max-height:calc(100vh - 250px);overflow:auto;padding:4px}
-body.board .tile{padding:14px 4px 10px}
-body.board .tile .no{font-size:40px}
-body.board .tile .nm{font-size:18px}
-body.board .tile .av{width:92px;height:92px;font-size:34px}
-body.board .avc{width:68px;height:68px}
-body.board .aconf .big{width:210px;height:210px}
-body.board .step{font-size:22px}
-body.board .phint{font-size:22px;padding:12px}
-body.board .egrid{grid-template-columns:repeat(4,1fr);gap:14px}
-body.board .egrid .ecard{flex-direction:column;text-align:center;padding:14px 6px 12px;gap:6px}
-body.board .egrid .ecard b{font-size:22px}
-body.board .egrid .ecard small,body.board .egrid.compact .ecard small{display:block;font-size:14px}
+body.board .colL .card,body.board .colR .card{margin-bottom:calc(12px*var(--bs,1));padding:calc(16px*var(--bs,1))}
+body.board .step{font-size:calc(22px*var(--bs,1));margin-bottom:calc(10px*var(--bs,1))}
+body.board .step span{width:calc(26px*var(--bs,1));height:calc(26px*var(--bs,1));line-height:calc(26px*var(--bs,1));font-size:calc(15px*var(--bs,1))}
+body.board .tiles{grid-template-columns:repeat(auto-fill,minmax(calc(108px*var(--bs,1)),1fr));gap:calc(12px*var(--bs,1));padding:4px;max-height:calc(100vh - 190px);overflow:auto}
+body.board .tile{padding:calc(12px*var(--bs,1)) 4px calc(8px*var(--bs,1))}
+body.board .tile .no{font-size:calc(40px*var(--bs,1))}
+body.board .tile .nm{font-size:calc(18px*var(--bs,1))}
+body.board .tile .av{width:calc(92px*var(--bs,1));height:calc(92px*var(--bs,1));margin-top:calc(4px*var(--bs,1));font-size:calc(34px*var(--bs,1))}
+body.board .tile.done{padding-bottom:calc(22px*var(--bs,1))}
+body.board .tile .dn{font-size:calc(12px*var(--bs,1))}
+body.board .avc{width:calc(68px*var(--bs,1));height:calc(68px*var(--bs,1))}
+body.board .hello{font-size:calc(26px*var(--bs,1));margin-top:calc(8px*var(--bs,1));min-height:calc(30px*var(--bs,1))}
+body.board .phint{font-size:calc(22px*var(--bs,1));padding:calc(10px*var(--bs,1));margin-bottom:calc(10px*var(--bs,1))}
+body.board .egrid{grid-template-columns:repeat(4,1fr);gap:calc(14px*var(--bs,1))}
+body.board .egrid .ecard{flex-direction:column;text-align:center;padding:calc(14px*var(--bs,1)) 6px calc(12px*var(--bs,1));gap:calc(6px*var(--bs,1));border-radius:calc(20px*var(--bs,1))}
+body.board .egrid .ecard b{font-size:calc(22px*var(--bs,1))}
+body.board .egrid .ecard small,body.board .egrid.compact .ecard small{display:block;font-size:calc(14px*var(--bs,1))}
+body.board .egrid .ecard svg{width:calc(var(--fs,70px)*var(--bs,1));height:calc(var(--fs,70px)*var(--bs,1))}
+body.board .egrid.big{--fs:120px}
+body.board .egrid:not(.big):not(.compact){--fs:84px}
+body.board .egrid.compact{--fs:72px}
+body.board .tier{margin:calc(6px*var(--bs,1)) 0 0;font-size:calc(14px*var(--bs,1))}
 body.board .egrid-note{display:none}
 body.board .sendRow{display:flex;gap:14px;align-items:stretch}
 body.board .sendRow .card{flex:1;margin:0}
-body.board .sendRow textarea{font-size:20px;padding:10px}
-body.board .sendRow .go{flex:0 0 310px;font-size:28px;margin:0;border-radius:22px}
-body.board .hello{font-size:26px}
+body.board .sendRow textarea{font-size:calc(20px*var(--bs,1));padding:calc(10px*var(--bs,1));height:calc(64px*var(--bs,1))}
+body.board .sendRow .go{flex:0 0 calc(310px*var(--bs,1));font-size:calc(28px*var(--bs,1));margin:0;border-radius:22px}
+body.board .aconf .big{width:210px;height:210px}
 body.board .apick{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);width:min(940px,94vw);max-height:88vh;overflow:auto;z-index:40;margin:0;box-shadow:0 0 0 100vmax rgba(0,0,0,.45),0 24px 70px rgba(0,0,0,.4);border:3px solid #fff}
 body.board .apx{display:block;position:absolute;top:8px;right:12px;border:0;background:#fff;border-radius:50%;width:40px;height:40px;font-size:20px;cursor:pointer}
 body.board .agrid{grid-template-columns:repeat(auto-fill,minmax(104px,1fr));gap:12px}
 body.board .apick .sub{padding-right:52px}   /* 讓說明文字不被右上角的關閉鈕壓到 */
-/* 臉的大小隨螢幕高度縮放，讓卡片、座號、送出鈕都能在同一個畫面內 */
-body.board .egrid .ecard svg{width:var(--fs,70px);height:var(--fs,70px)}
-body.board .egrid.big{--fs:clamp(56px,13vh,120px)}
-body.board .egrid:not(.big):not(.compact){--fs:clamp(44px,9vh,80px)}
-body.board .egrid.compact{--fs:clamp(40px,7.2vh,70px)}
-@media (max-height:860px){
-  body.board .wrap{padding:8px 20px 10px}
-  body.board h1{font-size:26px}
-  body.board .sub{font-size:14px;margin-bottom:6px}
-  body.board .demo{display:none}
-  body.board .colL .card,body.board .colR .card{padding:10px 14px;margin-bottom:8px}
-  body.board .step{font-size:18px;margin-bottom:6px}
-  body.board .step span{width:24px;height:24px;line-height:24px;font-size:14px}
-  body.board .phint{font-size:17px;padding:6px;margin-bottom:8px}
-  body.board .hello{font-size:19px;margin-top:6px;min-height:22px}
-  body.board .tiles{grid-template-columns:repeat(auto-fill,minmax(86px,1fr));gap:8px;max-height:calc(100vh - 175px)}
-  body.board .tile{padding:8px 2px 6px}
-  body.board .tile .no{font-size:28px}
-  body.board .tile .nm{font-size:14px}
-  body.board .tile .av{width:64px;height:64px;font-size:24px;margin-top:3px}
-  body.board .avc{width:46px;height:46px}
-  body.board .agrid{grid-template-columns:repeat(auto-fill,minmax(82px,1fr));gap:8px}
-  body.board .aconf .big{width:150px;height:150px}
-  body.board .tile.done{padding-bottom:18px}
-  body.board .egrid{gap:8px}
-  body.board .egrid .ecard{padding:8px 4px;gap:3px;border-radius:16px}
-  body.board .egrid .ecard b{font-size:18px}
-  body.board .egrid .ecard small{font-size:12px}
-  body.board .egrid.compact .ecard small{display:none}
-  body.board .egrid-note{display:none}
-  body.board .tier{margin:0;font-size:12px}
-  body.board .sendRow .go{font-size:22px;flex-basis:230px}
-  body.board .sendRow textarea{height:52px;font-size:17px;padding:8px}
-}
 .done-view{text-align:center}
 .big{font-size:64px}
 .tips{text-align:left;margin:10px 0 0;padding-left:20px;line-height:1.7}
@@ -282,6 +258,19 @@ function applyKind(){
 }
 /* 大螢幕模式：寬度 ≥ 900px（或網址加 ?board=1）自動啟用 */
 const BOARD = () => document.body.classList.contains('board');
+/* 自動縮放：把 --bs 從 1 逐步調小，直到整個畫面（含座號清單）不用捲動。視窗大小、瀏覽器顯示比例不同都適用 */
+let fitRaf=0;
+function fitBoard(){
+  cancelAnimationFrame(fitRaf);
+  fitRaf=requestAnimationFrame(()=>{
+    const b=document.body;
+    if(!BOARD()){ b.style.removeProperty('--bs'); return; }
+    let bs=1; b.style.setProperty('--bs',bs);
+    const t=$('tiles');
+    const over=()=>document.documentElement.scrollHeight>window.innerHeight+1 || (t&&t.scrollHeight>t.clientHeight+1);
+    while(bs>0.4 && over()){ bs=Math.round((bs-0.03)*100)/100; b.style.setProperty('--bs',bs); }
+  });
+}
 function updateBoard(){
   const on = window.matchMedia('(min-width: 900px)').matches || new URLSearchParams(location.search).get('board')==='1';
   document.body.classList.toggle('board', on);
@@ -366,7 +355,10 @@ function init(){
   $('grade').onchange = $('klass').onchange = loadClass;
   $('apx').onclick = () => $('apick').classList.add('hide');
   updateBoard();
-  window.addEventListener('resize', () => { const was=BOARD(); updateBoard(); if (was!==BOARD()){ renderEmotions(); renderTiles(); if(state.seat) showHello(); } });
+  new MutationObserver(fitBoard).observe(document.querySelector('.wrap'),{childList:true,subtree:true,characterData:true,attributes:true,attributeFilter:['class']});
+  window.addEventListener('resize', fitBoard);
+  fitBoard();
+  window.addEventListener('resize', () => { const was=BOARD(); updateBoard(); if (was!==BOARD()){ renderEmotions(); renderTiles(); if(state.seat) showHello(); } fitBoard(); });
   $('send').onclick = submit;
   $('again').onclick = backToList;
   loadClass();
