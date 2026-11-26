@@ -1,6 +1,6 @@
 /* SEL 情緒統計（短／中／長期）共用畫面：teacher.html 與 principal.html 都載入這支檔案 */
 (function(){
-  const RANGES=[{days:7,label:'短期 7 天'},{days:30,label:'中期 30 天'},{days:180,label:'長期 180 天（約一學期）'}];
+  const RANGES=[{days:7,label:'短期 7 天'},{days:30,label:'中期 30 天'},{days:180,label:'長期 180 天（約一學期）'},{days:365,label:'全年 365 天'}];
   const COL={red:'#e5484d',blue:'#3b82f6',yellow:'#f5b301',green:'#2fa86b'};
   const ZH={red:'紅·生氣',blue:'藍·沮喪',yellow:'黃·焦慮',green:'綠·平和'};
   const GRADE_ZH=['','一','二','三','四','五','六'];
@@ -24,6 +24,8 @@
 .st-leg{display:flex;gap:12px;flex-wrap:wrap;font-size:13px;margin-top:8px}.st-leg i{display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:4px;vertical-align:-1px}
 .st-bar{display:flex;align-items:center;gap:8px;margin:5px 0;font-size:14px}.st-bar .nm{width:150px;flex:none}.st-bar .tr{flex:1;background:#f1f5f9;border-radius:6px;height:16px;overflow:hidden}.st-bar .tr i{display:block;height:100%}
 .st-t{width:100%;border-collapse:collapse;font-size:14px}.st-t th,.st-t td{text-align:left;padding:6px 5px;border-bottom:1px solid #e5e7eb}
+.st-dns{display:flex;gap:10px;flex-wrap:wrap;justify-content:space-around}.st-dn{flex:1;min-width:190px;text-align:center}.st-dnh{font-weight:700;margin-bottom:8px;font-size:15px}
+.st-ring{width:150px;height:150px;border-radius:50%;margin:0 auto 8px;display:flex;align-items:center;justify-content:center}.st-ring>div{width:86px;height:86px;border-radius:50%;background:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center}.st-ring b{font-size:22px;line-height:1}.st-ring span{font-size:12px;color:#6b7280}
 .st-note{color:#6b7280;font-size:13px;margin-top:6px}`;
   if(!document.getElementById('st-css')){const s=document.createElement('style');s.id='st-css';s.textContent=css;document.head.appendChild(s)}
 
@@ -83,6 +85,35 @@
       `<div class="st-note">進步＝Check-out 比 Check-in 更平和；轉差的同學建議當天關心。若 Check-out 的負向占比明顯高於 Check-in，可回頭看當天的課程與互動。</div></div>`;
     return h;
   }
+  // 圓餅（甜甜圈）圖：用 conic-gradient，不需外部套件
+  function donut(title,t){
+    if(!t||!t.n)return `<div class="st-dn"><div class="st-dnh">${title}</div><div class="st-note">沒有資料</div></div>`;
+    let acc=0;const stops=['red','blue','yellow','green'].map(k=>{const a=acc/t.n*100;acc+=t[k]||0;return `${COL[k]} ${a}% ${acc/t.n*100}%`}).join(',');
+    return `<div class="st-dn"><div class="st-dnh">${title}</div><div class="st-ring" style="background:conic-gradient(${stops})"><div><b>${t.n}</b><span>人次</span></div></div>
+      <div class="st-leg" style="justify-content:center">${['red','blue','yellow','green'].map(k=>`<span><i style="background:${COL[k]}"></i>${ZH[k].split('·')[1]} ${t[k]||0}（${pct((t[k]||0)/t.n)}）</span>`).join('')}</div></div>`;
+  }
+  function pies(d){
+    return `<div class="st-card"><h3>🥧 情緒分布（圓餅圖）</h3><div class="st-dns">${donut('全部',d.totals)}${donut('👋 Check-in',d.kinds&&d.kinds.ci)}${donut('🏁 Check-out',d.kinds&&d.kinds.co)}</div></div>`;
+  }
+  // 折線圖：負向（紅＋藍＋黃）與綠色占比的走勢
+  function lineChart(d){
+    const S=d.series||[];if(S.length<2)return '';
+    const W=640,H=200,L=36,R=10,T=12,B=26,x=i=>L+(W-L-R)*(S.length===1?0.5:i/(S.length-1)),y=v=>T+(H-T-B)*(1-v);
+    const neg=S.map(b=>b.n?(b.red+b.blue+b.yellow)/b.n:0),grn=S.map(b=>b.n?b.green/b.n:0);
+    const path=a=>a.map((v,i)=>(i?'L':'M')+x(i).toFixed(1)+' '+y(v).toFixed(1)).join(' ');
+    const grid=[0,.25,.5,.75,1].map(v=>`<line x1="${L}" x2="${W-R}" y1="${y(v)}" y2="${y(v)}" stroke="#e5e7eb"/><text x="${L-6}" y="${y(v)+4}" font-size="11" fill="#6b7280" text-anchor="end">${Math.round(v*100)}%</text>`).join('');
+    const step=Math.ceil(S.length/8),labs=S.map((b,i)=>i%step===0?`<text x="${x(i)}" y="${H-8}" font-size="11" fill="#6b7280" text-anchor="middle">${b.key.slice(5)}</text>`:'').join('');
+    const dots=(a,c)=>a.map((v,i)=>`<circle cx="${x(i)}" cy="${y(v)}" r="3" fill="${c}"><title>${S[i].key}：${Math.round(v*100)}%（${S[i].n} 人次）</title></circle>`).join('');
+    return `<div class="st-card"><h3>📈 情緒占比走勢（折線圖）</h3><svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto">${grid}${labs}
+      <path d="${path(neg)}" fill="none" stroke="${COL.red}" stroke-width="2.5"/>${dots(neg,COL.red)}<path d="${path(grn)}" fill="none" stroke="${COL.green}" stroke-width="2.5"/>${dots(grn,COL.green)}</svg>
+      <div class="st-leg"><span><i style="background:${COL.red}"></i>負向情緒（紅＋藍＋黃）占比</span><span><i style="background:${COL.green}"></i>綠色占比</span><span class="st-note">${d.bucket==='week'?'每週':'每日'}一個點，滑鼠移到點上可看人次</span></div></div>`;
+  }
+  // 各班情緒組成：100% 堆疊橫條
+  function classBars(d){
+    const B=(d.byClass||[]).filter(c=>c.n>0);if(!B.length)return '';
+    return `<div class="st-card"><h3>📊 各班情緒組成（長條圖）</h3>`+B.map(c=>`<div class="st-bar"><span class="nm">${clsLabel(c.cls)}（${c.n}）</span><span class="tr" style="display:flex;height:20px">${['red','blue','yellow','green'].map(k=>c[k]?`<i style="width:${c[k]/c.n*100}%;background:${COL[k]}" title="${ZH[k]} ${c[k]}（${pct(c[k]/c.n)}）"></i>`:'').join('')}</span><span style="width:46px;text-align:right">${pct(c.neg)}</span></div>`).join('')+
+      `<div class="st-leg">${Object.keys(COL).map(k=>`<span><i style="background:${COL[k]}"></i>${ZH[k]}</span>`).join('')}<span class="st-note">右側數字＝負向占比</span></div></div>`;
+  }
   function watch(d,showCls){
     const w=d.watch||[];
     return `<div class="st-card"><h3>🔎 持續關注學生（${w.length} 位）</h3>`+(w.length?`<table class="st-t"><tr>${showCls?'<th>班級</th>':''}<th>座號</th><th>姓名</th><th>原因</th><th>簽到次數</th><th>最近</th></tr>`+
@@ -98,7 +129,7 @@
         <div><b>${t.n}</b><span>簽到人次（${d.start.slice(5)} ～ ${d.end.slice(5)}）</span></div>
         <div><b>${pct(t.neg)}</b><span>負向情緒（紅＋藍＋黃）<br>${delta(t.neg,p.neg,hasPrev)}</span></div>
         <div><b>${pct(t.n?t.green/t.n:0)}</b><span>綠色（平和快樂）</span></div></div>`}
-        ${changeCard(d)}${opts.hideTrend?'':`<div class="st-card"><h3>情緒走勢</h3>${chart(d)}</div>`}${classes(d)}${emotions(d)}${watch(d,opts.showCls)}`;
+        ${pies(d)}${changeCard(d)}${opts.hideTrend?'':`<div class="st-card"><h3>情緒走勢（長條圖）</h3>${chart(d)}</div>${lineChart(d)}`}${classBars(d)}${classes(d)}${emotions(d)}${watch(d,opts.showCls)}`;
     },
     tabs(active){
       return `<div class="st-tabs">`+RANGES.map(r=>`<button data-days="${r.days}" class="${r.days===active?'on':''}">${r.label}</button>`).join('')+`</div>`;
