@@ -94,11 +94,11 @@
     /* 回傳統計畫面 HTML。opts.showCls：顯示班級欄（校長）；opts.tabsHtml：頁面自行傳入期間按鈕 */
     html(d,opts){
       opts=opts||{};const t=d.totals,p=d.prevTotals,hasPrev=p.n>0;
-      return `<div class="st-sum">
+      return `${opts.noSummary?'':`<div class="st-sum">
         <div><b>${t.n}</b><span>簽到人次（${d.start.slice(5)} ～ ${d.end.slice(5)}）</span></div>
         <div><b>${pct(t.neg)}</b><span>負向情緒（紅＋藍＋黃）<br>${delta(t.neg,p.neg,hasPrev)}</span></div>
-        <div><b>${pct(t.n?t.green/t.n:0)}</b><span>綠色（平和快樂）</span></div></div>
-        ${changeCard(d)}<div class="st-card"><h3>情緒走勢</h3>${chart(d)}</div>${classes(d)}${emotions(d)}${watch(d,opts.showCls)}`;
+        <div><b>${pct(t.n?t.green/t.n:0)}</b><span>綠色（平和快樂）</span></div></div>`}
+        ${changeCard(d)}${opts.hideTrend?'':`<div class="st-card"><h3>情緒走勢</h3>${chart(d)}</div>`}${classes(d)}${emotions(d)}${watch(d,opts.showCls)}`;
     },
     tabs(active){
       return `<div class="st-tabs">`+RANGES.map(r=>`<button data-days="${r.days}" class="${r.days===active?'on':''}">${r.label}</button>`).join('')+`</div>`;
