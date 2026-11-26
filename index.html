@@ -73,13 +73,6 @@ textarea{resize:vertical}
    所有尺寸都乘上 --bs（由 JS 依「目前視窗高度」自動調整），確保整個畫面不用捲動。 */
 .cols{display:block}
 .apx{display:none}
-.toast{position:fixed;left:50%;top:10px;transform:translateX(-50%);z-index:50;background:#1f2937;color:#fff;border-radius:999px;padding:8px 10px 8px 22px;display:flex;align-items:center;gap:14px;font-size:20px;font-weight:700;white-space:nowrap;box-shadow:0 6px 22px rgba(0,0,0,.28);animation:toastIn .18s ease-out}
-.toast.hide{display:none}
-.toast .tk{font-size:22px}
-.toast .undo{margin:0;font-size:17px;padding:7px 16px;border-radius:999px;border:0;background:#fff;color:#1f2937}
-@keyframes toastIn{from{opacity:0;transform:translateX(-50%) translateY(-12px)}to{opacity:1;transform:translateX(-50%)}}
-.tile.pulse{animation:pulseTile 1.1s ease-out}
-@keyframes pulseTile{0%{box-shadow:0 0 0 0 rgba(16,185,129,.75);background:#d1fae5}100%{box-shadow:0 0 0 22px rgba(16,185,129,0)}}
 body.board .wrap{max-width:1700px;padding:calc(14px*var(--bs,1)) 28px calc(16px*var(--bs,1))}
 body.board h1{font-size:calc(36px*var(--bs,1));margin:0}
 body.board .sub{font-size:calc(18px*var(--bs,1));margin-bottom:calc(8px*var(--bs,1))}
@@ -178,8 +171,6 @@ body.auto .go,body.auto .sendRow{display:none}
       </div>
     </div>
   </div>
-
-  <div id="toast" class="toast hide" role="status"></div>
 
   <div id="doneView" class="card done-view hide">
     <div class="bigface" id="dEmoji"></div>
@@ -441,32 +432,23 @@ function renderEmotions(){
     if (AUTO) submit(); };
 }
 function check(){ $('send').disabled = !(state.cls && state.seat && state.emo); }
-let toastTimer=null;
-// 大螢幕送出後：畫面立刻回到初始狀態讓下一位直接點選；頂端只留一條細提示（不顯示心情內容、不擋任何按鈕），5 秒後自動消失
-function showToast(seat, per){
-  const K=KIND[per];
-  $('toast').innerHTML = `<span><span class="tk">✓</span> ${seat} 號　${K.icon} ${K.label} 完成</span><button class="undo" id="toastUndo">↩︎ 按錯了</button>`;
-  $('toast').classList.remove('hide');
-  $('toastUndo').onclick = ev => { ev.stopPropagation(); undoLast(); };
-  clearTimeout(toastTimer); toastTimer = setTimeout(() => $('toast').classList.add('hide'), 5000);
-  nextStudent();                                              // 立刻換下一位
-  const t=document.querySelector('.tile[data-s="'+seat+'"]'); if(t){ t.classList.add('pulse'); }   // 剛送出的座號閃一下綠色
-}
+// 大螢幕送出後：按下就完成，不顯示任何提示、視窗或動畫，畫面立刻回到初始狀態讓下一位直接點選
+function afterBoardSubmit(){ nextStudent(); }
 // 按錯了：撤銷剛剛那一筆，回到「同一位同學、重新選心情」
 async function undoLast(){
   const L=state.lastSubmit; if(!L) return;
-  clearTimeout(toastTimer); $('err').textContent='';
+  $('err').textContent='';
   try{
     const r = await api('undo',{cls:L.cls, seat:L.seat});
     if (!r.ok) throw new Error(r.error||'fail');
     state.done[L.per] = (state.done[L.per]||[]).filter(x=>x!==L.seat); state.lastSubmit=null;
-    $('toast').classList.add('hide'); $('doneView').classList.add('hide'); $('formView').classList.remove('hide');
+    $('doneView').classList.add('hide'); $('formView').classList.remove('hide');
     state.seat=L.seat; state.emo=null; state.kind=nextKind();
     document.querySelectorAll('.ecard').forEach(x=>x.classList.remove('sel','dim'));
     showHello(); applyKind(); renderTiles(); check();
     $('err').textContent='已撤銷，請重新選一次心情。';
   }catch(e){
-    $('toast').classList.add('hide'); $('doneView').classList.add('hide'); $('formView').classList.remove('hide');
+    $('doneView').classList.add('hide'); $('formView').classList.remove('hide');
     nextStudent();   // 先回到初始狀態（會清空提示），再顯示無法撤銷的原因
     $('err').textContent='無法撤銷（已超過 3 分鐘或網路問題），請請老師協助更正。';
   }
@@ -496,7 +478,7 @@ async function submit(){
     $('dEmoji').innerHTML=SELFaces.svg(e.name,110); $('dTitle').textContent=`${KIND[per].icon} ${KIND[per].label}：「${e.name}」（${c.zh}・${c.feel}區）`; $('dMsg').textContent=c.msg;
     $('dTips').innerHTML = c.tips.map(t=>`<li>${t}</li>`).join('') + `<li style="list-style:none;margin-top:6px;color:var(--pri);font-weight:700">${KIND[per].after}</li>`;
     $('dSig').innerHTML = SIGNALS.map((g,i)=>`<div class="sc"><img src="${g.img}" alt="${g.name}" loading="lazy"><b>${i+1}. ${g.name}</b>${g.use}</div>`).join('');
-    if (BOARD()){ showToast(state.seat, per); return; }   // 大螢幕：不跳大視窗、立刻換下一位
+    if (BOARD()){ afterBoardSubmit(); return; }   // 大螢幕：不顯示任何提示、立刻換下一位
     $('formView').classList.add('hide'); $('doneView').classList.remove('hide'); window.scrollTo(0,0);
   }catch(e){ $('err').textContent='送出失敗，請檢查網路後再試一次。'; check(); }
   finally { state.busy = false; }
