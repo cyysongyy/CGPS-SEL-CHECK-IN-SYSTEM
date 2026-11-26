@@ -400,6 +400,18 @@ function doPost(e) {
       rsh.getRange(target + 1, col + 1).setValue(av);
       return out_({ ok: true });
     }
+    if (a === 'undo') {   // 學生按錯：撤銷「自己今天最新的一筆」，僅限送出後 3 分鐘內（防止誤刪別人的紀錄）
+      var ucls = str_(b.cls, 10), useat = Number(b.seat), ush = sheet_('Checkins'), uv = ush.getDataRange().getValues(), uh = uv[0];
+      var cC = uh.indexOf('班級'), cS = uh.indexOf('座號'), cD = uh.indexOf('日期'), cT = uh.indexOf('時間'), utoday = today_(), found = -1, cnt = 0;
+      for (var u = uv.length - 1; u >= 1; u--) {
+        if (String(uv[u][cC]) === ucls && Number(uv[u][cS]) === useat && dateStr_(uv[u][cD]) === utoday) { cnt++; if (found < 0) found = u; }
+      }
+      if (found < 0) return out_({ ok: false, error: 'not found' });
+      var age = (Date.parse(now_().replace(' ', 'T') + '+08:00') - Date.parse(timeStr_(uv[found][cT]).replace(' ', 'T') + '+08:00')) / 1000;
+      if (!(age >= 0 && age <= 180)) return out_({ ok: false, error: 'too late' });
+      ush.deleteRow(found + 1);
+      return out_({ ok: true, kind: cnt === 1 ? 'ci' : 'co' });
+    }
     var acc = access_(b.pass);
     if (!acc) return out_({ ok: false, error: 'auth' });
     if (!can_(acc, b.cls)) return out_({ ok: false, error: 'forbidden' });

@@ -9,6 +9,16 @@
 | 老師看板（每班一組密碼，只看自己的班） | `https://cyysongyy.github.io/CGPS-SEL-CHECK-IN-SYSTEM/teacher.html` |
 | 校長總控台（全校，含姓名） | `https://cyysongyy.github.io/CGPS-SEL-CHECK-IN-SYSTEM/principal.html` |
 
+### 各班學生簽到連結（可直接做成 QR code）
+| 班級 | 連結 |
+|---|---|
+| 一年甲班 | `https://cyysongyy.github.io/CGPS-SEL-CHECK-IN-SYSTEM/?c=1甲` |
+| 二年甲班 | `https://cyysongyy.github.io/CGPS-SEL-CHECK-IN-SYSTEM/?c=2甲` |
+| 三年甲班 | `https://cyysongyy.github.io/CGPS-SEL-CHECK-IN-SYSTEM/?c=3甲` |
+| 四年甲班 | `https://cyysongyy.github.io/CGPS-SEL-CHECK-IN-SYSTEM/?c=4甲` |
+| 五年甲班 | `https://cyysongyy.github.io/CGPS-SEL-CHECK-IN-SYSTEM/?c=5甲` |
+| 六年甲班 | `https://cyysongyy.github.io/CGPS-SEL-CHECK-IN-SYSTEM/?c=6甲` |
+
 需先在本倉庫 **Settings → Pages → Source 選 `main` / `(root)`** 開啟 GitHub Pages。
 
 ---
@@ -41,10 +51,16 @@
 - 選錯或要重選：**老師（自己班）或校長**在老師看板點該學生 →「重設圖案」，該學生可以再選一次。也可以直接清空試算表 Roster 的「圖案」欄。
 - 圖案代號仍以 emoji 存進試算表（例如 🐶），所以舊資料相容；動物清單在 `animals.js`。
 
+## 點心情就是送出（不需要再按「送出」）
+- 流程：**點座號 →（選填）寫想說的話 → 點一個心情＝直接送出**，沒有另外的「送出」按鈕。因為點了就送，想寫的話要**先寫再點心情**。
+- 還沒點座號就點心情：不會送出，提示列會閃動提醒先點號碼；連點只會送出一筆。
+- **點錯了**：送出後畫面上有「↩︎ 按錯了，重選」（大螢幕提示約 4.5 秒，手機在完成頁），按下會撤銷剛剛那一筆並回到同一位同學重新選；撤銷只在送出後 **3 分鐘內**有效，且只能撤銷**該座號今天最新的一筆**。**已寄出的即時通知信無法收回。**
+- 想改回「選好再按送出」：把 `config.js` 的 `window.SEL_AUTO_SUBMIT` 改成 `false`。
+
 ## 大螢幕模式（教室白板／投影）
 - 螢幕寬度 ≥ 900px（或網址加 `?board=1`）自動啟用：**座號在左、心情卡片緊鄰在右、送出鈕在旁邊**，整個流程在同一個畫面內完成，不用捲動。
-- 卡片與座號依螢幕高度自動縮放（1920×1080、1366×768、1024×768 都放得下）。
-- 同學一個接一個點：點座號 → 點心情 → 送出 → 畫面中央跳出「X 號 Check-in 完成！」（約 3 秒，或點一下立刻關閉）→ 自動回到初始狀態，換下一位。
+- 版面會**依目前視窗高度自動縮放**，座號、心情、留言都放進同一個畫面不用捲動（視窗大小、瀏覽器顯示比例不同都適用）。
+- 同學一個接一個點：點座號 → 點心情（＝送出）→ 畫面中央跳出「X 號 Check-in 完成！」（約 3 秒，或點一下立刻關閉）→ 自動回到初始狀態，換下一位。
 - 大螢幕不會自動跳出選動物視窗（避免打斷流程），想選動物時按「🎨 選動物」。
 
 ## Check-in／Check-out，與當天心情變化
