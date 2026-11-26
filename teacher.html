@@ -76,6 +76,7 @@ textarea.roster{height:240px}
     <div class="st-tabs" id="viewTabs"><button data-v="today" class="on">📅 今日</button><button data-v="stats">📈 趨勢統計（短／中／長期）</button></div>
     <div id="statsView" class="hide"></div>
     <div id="todayView">
+    <div id="wkWarn"></div>
     <div id="alerts"></div>
     <div id="changeBox"></div>
     <div class="stats" id="stats"></div>
@@ -162,6 +163,11 @@ try{const sp=sessionStorage.getItem('sel_pass');if(sp){PASS=sp;get({action:'logi
 let view='today', sDays=7;
 $('viewTabs').onclick=e=>{const b=e.target.closest('button');if(!b)return;view=b.dataset.v;
   document.querySelectorAll('#viewTabs button').forEach(x=>x.classList.toggle('on',x===b));load()};
+let warnAt=0,warnCls='';
+async function loadWarn(){   // 一週預警橫幅（本班；最多每 5 分鐘重新計算一次）
+  if(DEMO||!cls||(warnCls===cls&&Date.now()-warnAt<300000))return;warnAt=Date.now();warnCls=cls;
+  try{const d=await get({action:'stats',cls,days:7});if(d.ok)$('wkWarn').innerHTML=SELStats.warnBanner(d,false)}catch(e){warnAt=0}
+}
 async function loadStats(){
   if(DEMO){$('statsView').innerHTML='<div class="mute">展示模式不提供統計，部署 Apps Script 後即可使用。</div>';return}
   $('statsView').innerHTML=SELStats.tabs(sDays)+'<div class="mute">統計中…</div>';
@@ -178,6 +184,7 @@ async function load(){
   if(!cls){$('grid').innerHTML='<div class="mute">請選擇班級</div>';$('stats').innerHTML='';$('alerts').innerHTML='';return}
   store.set('sel_teacher_class',cls);
   if(view==='stats'){loadStats();return}
+  loadWarn();
   $('meta').textContent='載入中…';
   try{
     const r=await get({action:'today',cls,date:$('date').value});

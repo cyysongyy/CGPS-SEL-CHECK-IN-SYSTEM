@@ -26,6 +26,7 @@
 .st-t{width:100%;border-collapse:collapse;font-size:14px}.st-t th,.st-t td{text-align:left;padding:6px 5px;border-bottom:1px solid #e5e7eb}
 .st-dns{display:flex;gap:10px;flex-wrap:wrap;justify-content:space-around}.st-dn{flex:1;min-width:190px;text-align:center}.st-dnh{font-weight:700;margin-bottom:8px;font-size:15px}
 .st-ring{width:150px;height:150px;border-radius:50%;margin:0 auto 8px;display:flex;align-items:center;justify-content:center}.st-ring>div{width:86px;height:86px;border-radius:50%;background:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center}.st-ring b{font-size:22px;line-height:1}.st-ring span{font-size:12px;color:#6b7280}
+.st-warn{background:#fff7ed;border:2px solid #fb923c;border-radius:12px;padding:10px 14px;margin:8px 0;line-height:1.7}.st-warn>b{color:#c2410c}
 .st-note{color:#6b7280;font-size:13px;margin-top:6px}`;
   if(!document.getElementById('st-css')){const s=document.createElement('style');s.id='st-css';s.textContent=css;document.head.appendChild(s)}
 
@@ -120,8 +121,13 @@
       w.map(s=>`<tr>${showCls?`<td>${clsLabel(s.cls)}</td>`:''}<td>${s.seat}</td><td>${esc(s.name)}</td><td>${s.why.map(esc).join('；')}</td><td>${s.n}</td><td><span style="color:${COL[s.last]}">●</span> ${ZH[s.last]}</td></tr>`).join('')+'</table>':'<div class="st-note">這段期間沒有達到關注條件的學生。</div>')+
       `<div class="st-note">條件（任一）：連續 3 次以上非綠色、簽到 5 次以上且負向占 60% 以上、紅色 3 次以上。僅供輔導參考，請搭配實際觀察。</div></div>`;
   }
+  // 一週預警橫幅：最近 7 天持續情緒不佳者（條件同「持續關注」），顯示在「今日」畫面最上方
+  function warnBanner(d,showCls){
+    const w=(d&&d.watch)||[];if(!w.length)return '';
+    return `<div class="st-warn"><b>⚠ 一週預警：${w.length} 位學生近 7 天情緒持續不佳</b>`+w.slice(0,8).map(s=>`<div>${showCls?clsLabel(s.cls)+' ':''}${s.seat}號 <b>${esc(s.name)}</b>　${s.why.map(esc).join('；')}　<span style="color:${COL[s.last]}">●</span></div>`).join('')+(w.length>8?`<div>…還有 ${w.length-8} 位，請看「趨勢統計」</div>`:'')+`</div>`;
+  }
   window.SELStats={
-    RANGES,
+    RANGES,warnBanner,
     /* 回傳統計畫面 HTML。opts.showCls：顯示班級欄（校長）；opts.tabsHtml：頁面自行傳入期間按鈕 */
     html(d,opts){
       opts=opts||{};const t=d.totals,p=d.prevTotals,hasPrev=p.n>0;

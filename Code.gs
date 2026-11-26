@@ -357,6 +357,57 @@ function testAlert() {
   Logger.log('已寄測試信給 ' + me);
 }
 
+// ===== 一週預警（Email）=====
+// 每天（上課日）由定時觸發器執行：看最近 7 天，持續情緒不佳的學生（連續 3 次以上非綠、簽到 5 次以上且負向 60% 以上、
+// 紅色 3 次以上、當天由綠轉差 3 次以上，任一條件）會寄信給該班導師與校長（指令碼屬性 PRINCIPAL_EMAIL）。
+// 同一位學生 3 天內只通知一次，避免天天重複寄信。使用方式：在編輯器選 setupWeeklyWarning 執行一次（會要求授權）。
+var WARN_GAP_DAYS_ = 3;
+function weeklyWarning() { return weeklyWarning_(false); }
+function weeklyWarning_(force) {
+  var dow = Number(Utilities.formatDate(new Date(), 'Asia/Taipei', 'u'));   // 1=週一 … 7=週日
+  if (!force && dow > 5) return { skipped: 'weekend' };
+  var st = stats_('', 7), watch = st.watch || [];
+  if (!watch.length) return { sent: 0, watch: 0 };
+  var props = PropertiesService.getScriptProperties(), sent = {};
+  try { sent = JSON.parse(prop_('WARN_SENT') || '{}'); } catch (e1) { sent = {}; }
+  var today = today_(), fresh = watch.filter(function (w) {
+    var last = sent[w.cls + '|' + w.seat];
+    return !last || last < addDays_(today, -(WARN_GAP_DAYS_ - 1));
+  });
+  if (!fresh.length) return { sent: 0, watch: watch.length };
+  var byMail = {}, valid = function (m) { m = String(m || '').trim(); return /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(m) ? m : ''; };
+  rows_('Teachers').forEach(function (r) {
+    var m = valid(r['信箱']); if (!m) return;
+    var c = String(r['班級']), mine = fresh.filter(function (w) { return w.cls === c; });
+    if (mine.length) byMail[m] = (byMail[m] || []).concat(mine);
+  });
+  var pm = valid(prop_('PRINCIPAL_EMAIL')); if (pm) byMail[pm] = fresh;
+  var dash = prop_('DASHBOARD_URL') || '', n = 0;
+  Object.keys(byMail).forEach(function (m) {
+    if (MailApp.getRemainingDailyQuota() < 1) return;
+    var list = byMail[m], seen = {}; list = list.filter(function (w) { var k = w.cls + '|' + w.seat; if (seen[k]) return false; seen[k] = 1; return true; });
+    MailApp.sendEmail({
+      to: m, name: 'SEL 情緒簽到', subject: '【SEL 一週預警】' + list.length + ' 位學生近一週情緒持續不佳（' + today + '）',
+      body: '統計期間：' + st.start + ' ～ ' + st.end + '\n\n' + list.map(function (w) {
+        return clsLabel_(w.cls) + ' ' + w.seat + '號 ' + w.name + '：' + w.why.join('；') + '（簽到 ' + w.n + ' 次，負向 ' + Math.round(w.neg * 100) + '%）';
+      }).join('\n') + '\n\n建議：找機會個別關心，了解近期發生的事，必要時轉介輔導室。' + (dash ? '\n看板：' + dash : '') +
+      '\n\n※ 本信含學生個資，請勿轉寄。同一位學生 ' + WARN_GAP_DAYS_ + ' 天內只通知一次。'
+    });
+    n++;
+  });
+  fresh.forEach(function (w) { sent[w.cls + '|' + w.seat] = today; });
+  Object.keys(sent).forEach(function (k) { if (sent[k] < addDays_(today, -30)) delete sent[k]; });
+  props.setProperty('WARN_SENT', JSON.stringify(sent));
+  return { sent: n, watch: watch.length, notified: fresh.length };
+}
+// 只需執行一次：建立「每天下午 4 點多」的定時觸發器（會先移除舊的同名觸發器，不會重複）
+function setupWeeklyWarning() {
+  ScriptApp.getProjectTriggers().forEach(function (t) { if (t.getHandlerFunction() === 'weeklyWarning') ScriptApp.deleteTrigger(t); });
+  ScriptApp.newTrigger('weeklyWarning').timeBased().everyDays(1).atHour(16).create();
+  Logger.log('已建立：每天 16:00 左右自動檢查（週六日略過）。立即試跑請執行 weeklyWarningNow。');
+}
+function weeklyWarningNow() { Logger.log(JSON.stringify(weeklyWarning_(true))); }
+
 // 前端以 text/plain 傳 JSON，避免 CORS 預檢
 function doPost(e) {
   var lock = LockService.getScriptLock();
