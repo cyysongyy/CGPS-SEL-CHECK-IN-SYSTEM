@@ -50,6 +50,7 @@ th,td{text-align:left;padding:7px 6px;border-bottom:1px solid var(--line);vertic
   <h2>🏫 SEL 校長總控台</h2>
   <div class="mute">請輸入校長密碼</div>
   <input type="password" id="pass" placeholder="校長密碼">
+  <label class="mute" style="display:block;margin:6px 0"><input type="checkbox" id="keep"> 在這台裝置記住（只有個人電腦才勾選）</label>
   <button id="loginBtn">進入</button>
   <div id="loginErr" style="color:#b91c1c;margin-top:8px"></div>
 </div>
@@ -118,7 +119,7 @@ $('loginBtn').onclick=login;$('pass').onkeydown=e=>{if(e.key==='Enter')login()};
 async function login(){
   PASS=$('pass').value;$('loginErr').textContent='';if(!PASS)return;
   try{const r=await getOverview(todayStr());if(!r.ok)throw 0}catch(e){$('loginErr').textContent='密碼錯誤、非校長密碼或無法連線';return}
-  try{sessionStorage.setItem('sel_ppass',PASS)}catch(e){}
+  try{sessionStorage.setItem('sel_ppass',PASS);if($('keep').checked)localStorage.setItem('sel_ppass_keep',PASS)}catch(e){}
   start();
 }
 function start(){
@@ -126,9 +127,13 @@ function start(){
   $('date').value=todayStr();$('date').onchange=load;$('refresh').onclick=load;$('csvBtn').onclick=exportCsv;$('clrAll').onclick=()=>clearDay('');
   load();clearInterval(timer);timer=setInterval(load,REFRESH_MS);
 }
-try{const sp=sessionStorage.getItem('sel_ppass');if(sp){PASS=sp;getOverview(todayStr()).then(r=>{if(r.ok)start()}).catch(()=>{})}}catch(e){}
+try{const sp=sessionStorage.getItem('sel_ppass')||localStorage.getItem('sel_ppass_keep');if(sp){PASS=sp;getOverview(todayStr()).then(r=>{if(r.ok)start()}).catch(()=>{})}}catch(e){}
 
-let view='today', sDays=7, sCls='';
+/* 外部連結（例如 Ybot 首頁）可直接開到指定畫面：
+   principal.html?view=report&mode=week｜?view=report&mode=day｜?view=report&mode=month｜?view=stats&days=180｜?view=today */
+const QP=new URLSearchParams(location.search);
+let view=['today','stats','report'].includes(QP.get('view'))?QP.get('view'):'today', sDays=[7,30,180,365].includes(+QP.get('days'))?+QP.get('days'):7, sCls='';
+document.querySelectorAll('#viewTabs button').forEach(x=>x.classList.toggle('on',x.dataset.v===view));
 $('viewTabs').onclick=e=>{const b=e.target.closest('button');if(!b)return;view=b.dataset.v;
   document.querySelectorAll('#viewTabs button').forEach(x=>x.classList.toggle('on',x===b));load()};
 async function loadStats(){
@@ -162,7 +167,7 @@ async function loadWarn(){   // 一週預警橫幅（最多每 5 分鐘重新計
   if(DEMO||Date.now()-warnAt<300000)return;warnAt=Date.now();
   try{const d=await (await fetch(GAS_URL+'?'+new URLSearchParams({action:'stats',days:7,pass:PASS}))).json();if(d.ok)$('wkWarn').innerHTML=SELStats.warnBanner(d,true)}catch(e){warnAt=0}
 }
-let rMode='week';
+let rMode=['day','week','month'].includes(QP.get('mode'))?QP.get('mode'):'week';
 async function loadReport(){
   const bar='<div class="no-print" style="display:flex;gap:10px;align-items:flex-start;flex-wrap:wrap">'+SELReport.tabs(rMode)+'<button id="rptPrint" style="margin:6px 0 12px;padding:7px 14px;border-radius:999px;border:2px solid #374151;background:#fff;font-size:15px;cursor:pointer">🖨 列印／存成 PDF</button></div>';
   if(DEMO){$('reportView').innerHTML=bar+'<div class="mute">展示模式不提供報告，部署 Apps Script 後即可使用。</div>';return}
