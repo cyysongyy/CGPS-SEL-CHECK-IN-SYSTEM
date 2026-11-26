@@ -250,9 +250,9 @@ function nextKind(){
 function applyKind(){
   const K = KIND[state.kind], st = GRADE_STYLE[state.grade] || GRADE_STYLE[3];
   const bothDone = state.seat && (state.done.ci||[]).includes(state.seat) && (state.done.co||[]).includes(state.seat);
-  $('stp2').textContent = `${K.icon} ${K.label}：${st.s2}` + (AUTO ? ' 👆 點一下就送出' : '');
+  $('stp2').textContent = `${K.icon} ${K.label}：${st.s2}` + (AUTO ? ' 👇 點一下就送出' : '');
   $('send').textContent = `送出 ${K.label} ✔`;
-  $('phint').textContent = !state.seat ? '先點上面自己的號碼 👆'
+  $('phint').textContent = !state.seat ? (BOARD() ? '先點左邊自己的號碼 👈' : '先點上面自己的號碼 👆')
     : bothDone ? '今天已完成 Check-in 和 Check-out，再送出會更新 Check-out'
     : state.kind==='ci' ? '👋 今天第一次：Check-in'
     : '🏁 今天第二次：Check-out';
@@ -364,7 +364,7 @@ function init(){
   new MutationObserver(fitBoard).observe(document.querySelector('.wrap'),{childList:true,subtree:true,characterData:true});
   window.addEventListener('resize', fitBoard);
   fitBoard();
-  window.addEventListener('resize', () => { const was=BOARD(); updateBoard(); if (was!==BOARD()){ renderEmotions(); renderTiles(); if(state.seat) showHello(); } fitBoard(); });
+  window.addEventListener('resize', () => { const was=BOARD(); updateBoard(); if (was!==BOARD()){ renderEmotions(); renderTiles(); if(state.seat) showHello(); applyKind(); } fitBoard(); });
   $('send').onclick = submit;
   $('again').onclick = backToList;
   $('dUndo').onclick = undoLast;
