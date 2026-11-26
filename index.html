@@ -28,6 +28,10 @@ select,textarea{width:100%;font-size:18px;padding:12px;border:2px solid var(--li
 .tile .dn{position:absolute;left:0;right:0;bottom:-1px;font-size:11px;color:#047857;background:#d1fae5;border-radius:0 0 12px 12px;padding:1px 0}
 .tile.done{padding-bottom:20px}
 .tile .av{display:flex;width:70px;height:70px;margin:6px auto 0;border-radius:50%;align-items:center;justify-content:center;font-size:29px;line-height:1;background:var(--abg,#FFF4C7)}
+.tile .avbtn{position:absolute;top:calc(4px*var(--bs,1));right:calc(4px*var(--bs,1));width:calc(34px*var(--bs,1));height:calc(34px*var(--bs,1));border-radius:50%;background:#fff3d6;border:2px solid #f3d38c;display:flex;align-items:center;justify-content:center;font-size:calc(17px*var(--bs,1));line-height:1}
+.tile.failed{border-color:#ef4444;background:#fef2f2}
+.netwarn{position:fixed;left:14px;bottom:14px;z-index:60;background:#b91c1c;color:#fff;border-radius:12px;padding:8px 14px;font-size:16px;font-weight:700;box-shadow:0 4px 16px rgba(0,0,0,.3)}
+.netwarn.hide{display:none}
 .tile .av.ph{background:transparent;border:2px dashed #cbd5e1;color:#94a3b8;font-size:22px}
 .tile .av svg,.avc svg,.agrid button svg{width:96%;height:96%}
 .aconf .big svg{width:96%;height:96%}
@@ -90,7 +94,7 @@ body.board .tile .av{width:calc(92px*var(--bs,1));height:calc(92px*var(--bs,1));
 body.board .tile.done{padding-bottom:calc(22px*var(--bs,1))}
 body.board .tile .dn{font-size:calc(12px*var(--bs,1))}
 body.board .avc{width:calc(68px*var(--bs,1));height:calc(68px*var(--bs,1))}
-body.board .hello{font-size:calc(26px*var(--bs,1));margin-top:calc(8px*var(--bs,1));min-height:calc(30px*var(--bs,1))}
+body.board .hello{display:none;font-size:calc(26px*var(--bs,1));margin-top:calc(8px*var(--bs,1));min-height:calc(30px*var(--bs,1))}
 body.board .phint{font-size:calc(22px*var(--bs,1));padding:calc(10px*var(--bs,1));margin-bottom:calc(10px*var(--bs,1))}
 body.board .egrid{grid-template-columns:repeat(4,1fr);gap:calc(14px*var(--bs,1))}
 body.board .egrid .ecard{flex-direction:column;text-align:center;padding:calc(14px*var(--bs,1)) 6px calc(12px*var(--bs,1));gap:calc(6px*var(--bs,1));border-radius:calc(20px*var(--bs,1))}
@@ -171,6 +175,8 @@ body.auto .go,body.auto .sendRow{display:none}
       </div>
     </div>
   </div>
+
+  <div id="netwarn" class="netwarn hide" role="status"></div>
 
   <div id="doneView" class="card done-view hide">
     <div class="bigface" id="dEmoji"></div>
@@ -254,12 +260,15 @@ function applyKind(){
 /* 大螢幕模式：寬度 ≥ 900px（或網址加 ?board=1）自動啟用 */
 const BOARD = () => document.body.classList.contains('board');
 /* 自動縮放：把 --bs 從 1 逐步調小，直到整個畫面（含座號清單）不用捲動。視窗大小、瀏覽器顯示比例不同都適用 */
-let fitRaf=0;
+let fitRaf=0, fitSig='';
 function fitBoard(){
   cancelAnimationFrame(fitRaf);
   fitRaf=requestAnimationFrame(()=>{
     const b=document.body;
-    if(!BOARD()){ b.style.removeProperty('--bs'); return; }
+    if(!BOARD()){ b.style.removeProperty('--bs'); fitSig=''; return; }
+    const sig=[innerWidth,innerHeight,$('tiles').children.length,(document.querySelector('.egrid')||{}).className,state.grade].join('|');
+    if(sig===fitSig) return;                                  // 視窗、座號數、版型都沒變：不必重算（點選時不再卡頓）
+    fitSig=sig;
     let bs=1; b.style.setProperty('--bs',bs);
     const t=$('tiles');
     const over=()=>document.documentElement.scrollHeight>window.innerHeight+1 || (t&&t.scrollHeight>t.clientHeight+1);
@@ -352,7 +361,7 @@ function init(){
   $('grade').onchange = $('klass').onchange = loadClass;
   $('apx').onclick = () => $('apick').classList.add('hide');
   updateBoard();
-  new MutationObserver(fitBoard).observe(document.querySelector('.wrap'),{childList:true,subtree:true,characterData:true,attributes:true,attributeFilter:['class']});
+  new MutationObserver(fitBoard).observe(document.querySelector('.wrap'),{childList:true,subtree:true,characterData:true});
   window.addEventListener('resize', fitBoard);
   fitBoard();
   window.addEventListener('resize', () => { const was=BOARD(); updateBoard(); if (was!==BOARD()){ renderEmotions(); renderTiles(); if(state.seat) showHello(); } fitBoard(); });
@@ -377,12 +386,15 @@ async function loadClass(){
 function renderTiles(){
   if (!state.roster.length){ $('tiles').innerHTML='<div class="sub">這個班級還沒有名單，請老師先匯入。</div>'; return; }
   $('tiles').innerHTML = state.roster.map(r=>
-    `<button class="tile ${(state.done.ci||[]).includes(r.seat)||(state.done.co||[]).includes(r.seat)?'done':''} ${state.seat===r.seat?'sel':''}" data-s="${r.seat}"><span class="no">${r.seat}</span><span class="nm">號</span>${r.avatar?`<span class="av" style="--abg:${abg(r.seat)}">${SELAnimals.html(r.avatar,66)}</span>`:'<span class="av ph">＋</span>'}${(state.done.co||[]).includes(r.seat)?'<span class="dn">✓✓ 今日完成</span>':(state.done.ci||[]).includes(r.seat)?'<span class="dn">✓ 已Check-in</span>':''}</button>`).join('');
+    `<button class="tile ${(state.done.ci||[]).includes(r.seat)||(state.done.co||[]).includes(r.seat)?'done':''} ${state.seat===r.seat?'sel':''} ${failedSeats.has(r.seat)?'failed':''}" data-s="${r.seat}"><span class="no">${r.seat}</span><span class="nm">號</span>${r.avatar?`<span class="av" style="--abg:${abg(r.seat)}">${SELAnimals.html(r.avatar,66)}</span>`:'<span class="av ph">＋</span>'}${(!r.avatar&&BOARD())?'<span class="avbtn" title="選動物">🎨</span>':''}${(state.done.co||[]).includes(r.seat)?'<span class="dn">✓✓ 今日完成</span>':(state.done.ci||[]).includes(r.seat)?'<span class="dn">✓ 已Check-in</span>':''}</button>`).join('');
   $('tiles').onclick = e => { const b=e.target.closest('.tile'); if(!b) return;
     state.seat=+b.dataset.s; state.kind=nextKind(); applyKind();
-    showHello(); renderTiles(); if(!BOARD()) $('emotions').scrollIntoView({behavior:'smooth',block:'nearest'}); check(); };
+    showHello(); renderTiles();
+    if (BOARD() && e.target.closest('.avbtn')){ $('apick').classList.remove('hide'); renderAvatars(); }   // 大螢幕：沒有動物的座號，點格子角落的 🎨 才開啟選動物；點格子本體只選座號（避免誤觸打斷流程）
+    if(!BOARD()) $('emotions').scrollIntoView({behavior:'smooth',block:'nearest'}); check(); };
 }
 function showHello(){
+  if (BOARD()) { $('hello').innerHTML=''; $('apick').classList.add('hide'); return; }   // 大螢幕：不顯示「你選了 X 號」與動物小圖，直接進行下一步
   const me = state.roster.find(r=>r.seat===state.seat)||{};
   $('hello').innerHTML = `${me.avatar?`<span class="avc" style="--abg:${abg(me.seat)}">${SELAnimals.html(me.avatar,44)}</span> `:''}你選了 ${state.seat} 號 ` + ((!me.avatar&&BOARD())?`<button class="link" id="chAv">🎨 選動物（只能選一次）</button>`:'');
   const needPick = !me.avatar && !BOARD();   // 大螢幕不打斷流程，想選圖案再按按鈕
@@ -429,7 +441,7 @@ function renderEmotions(){
     if (AUTO && !state.seat){ const h=$('phint'); h.classList.remove('flash'); void h.offsetWidth; h.classList.add('flash'); return; }   // 還沒點座號：提示先點號碼
     state.emo = EMOTIONS.find(x=>x.name===b.dataset.n);
     document.querySelectorAll('.ecard').forEach(x=>{x.classList.toggle('sel',x===b); x.classList.toggle('dim',x!==b);}); check();
-    if (AUTO) submit(); };
+    if (AUTO) { if (BOARD()) submitFast(); else submit(); } };
 }
 function check(){ $('send').disabled = !(state.cls && state.seat && state.emo); }
 // 大螢幕送出後：按下就完成，不顯示任何提示、視窗或動畫，畫面立刻回到初始狀態讓下一位直接點選
@@ -464,12 +476,55 @@ function backToList(){
   $('doneView').classList.add('hide'); $('formView').classList.remove('hide');
   loadClass(); window.scrollTo(0,0);
 }
+/* 大螢幕「按下就完成」：樂觀更新＋背景送出。
+   點心情後畫面「立刻」回到初始狀態（不等伺服器回應，下一位馬上能點），簽到資料放進佇列依序送出；
+   網路失敗會自動重試（帶同一個 reqId，後端不會重複寫入）；全部失敗才在該座號格標紅並提示再點一次。 */
+const sendQueue=[], failedSeats=new Set(); let pumping=false;
+const newReqId=()=>Math.random().toString(36).slice(2,10)+Date.now().toString(36);
+function submitFast(){
+  const e=state.emo, seat=state.seat; if(!e||!seat) return;
+  const guess=nextKind();                                   // 預測是 Check-in 還是 Check-out（實際以後端為準）
+  (state.done[guess]=state.done[guess]||[]).includes(seat)||state.done[guess].push(seat);
+  failedSeats.delete(seat);
+  sendQueue.push({payload:{cls:state.cls,seat,color:e.color,emotion:e.em+' '+e.name,note:'',reqId:newReqId()},seat,guess,tries:0});
+  nextStudent();                                            // 立刻換下一位
+  pump();
+}
+function failFor(it){ state.done[it.guess]=(state.done[it.guess]||[]).filter(x=>x!==it.seat); failedSeats.add(it.seat); renderTiles(); }
+function warn(){
+  const w=$('netwarn'), retrying=sendQueue.some(i=>i.tries>0), f=[...failedSeats];
+  if(!retrying&&!f.length){ w.classList.add('hide'); return; }
+  w.textContent = f.length ? `⚠ ${f.join('、')} 號的簽到沒有成功，請再點一次` : `⚠ 網路不穩，${sendQueue.length} 筆簽到正在重試…`;
+  w.classList.remove('hide');
+}
+async function pump(){
+  if(pumping) return; pumping=true;
+  while(sendQueue.length){
+    const it=sendQueue[0]; let r=null;
+    try{ r=await api('checkin',it.payload); }catch(err){ r=null; }
+    if(r && r.ok){
+      sendQueue.shift(); failedSeats.delete(it.seat);
+      if(r.kind && r.kind!==it.guess){                       // 伺服器判定與預測不同（例如另一台裝置也簽到過）：校正標記
+        state.done[it.guess]=(state.done[it.guess]||[]).filter(x=>x!==it.seat);
+        (state.done[r.kind]=state.done[r.kind]||[]).includes(it.seat)||state.done[r.kind].push(it.seat); renderTiles(); }
+    } else if (r && r.error) { sendQueue.shift(); failFor(it); }   // 伺服器明確拒絕（不是網路問題）：不重試
+    else {                                                   // 網路問題：稍後重試同一筆
+      it.tries++;
+      if(it.tries>=6){ sendQueue.shift(); failFor(it); }
+      else { warn(); await new Promise(res=>setTimeout(res, Math.min((window.SEL_RETRY_BASE||1000)*it.tries,5000))); }
+    }
+    warn();
+  }
+  pumping=false; warn();
+}
+window.addEventListener('beforeunload',e=>{ if(sendQueue.length){ e.preventDefault(); e.returnValue=''; } });
+
 async function submit(){
   if (state.busy) return;
   state.busy = true; $('send').disabled = true; $('err').textContent='';
   try{
     const e = state.emo;
-    const r = await api('checkin',{cls:state.cls, seat:state.seat, color:e.color, emotion:e.em+' '+e.name, note:''});
+    const r = await api('checkin',{cls:state.cls, seat:state.seat, color:e.color, emotion:e.em+' '+e.name, note:'', reqId:newReqId()});
     if (!r.ok) throw new Error(r.error||'fail');
     const per = r.kind || state.kind;   // 以後端判定為準（當天第一次＝Check-in，第二次起＝Check-out）
     state.lastSubmit = {cls:state.cls, seat:state.seat, per};   // 供「按錯了」撤銷
