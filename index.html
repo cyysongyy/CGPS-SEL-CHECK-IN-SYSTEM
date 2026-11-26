@@ -441,11 +441,11 @@ function renderEmotions(){
     if (AUTO && !state.seat){ const h=$('phint'); h.classList.remove('flash'); void h.offsetWidth; h.classList.add('flash'); return; }   // 還沒點座號：提示先點號碼
     state.emo = EMOTIONS.find(x=>x.name===b.dataset.n);
     document.querySelectorAll('.ecard').forEach(x=>{x.classList.toggle('sel',x===b); x.classList.toggle('dim',x!==b);}); check();
-    if (AUTO) { if (BOARD()) submitFast(); else submit(); } };
+    if (AUTO) submitFast(); };
 }
 function check(){ $('send').disabled = !(state.cls && state.seat && state.emo); }
 // 大螢幕送出後：按下就完成，不顯示任何提示、視窗或動畫，畫面立刻回到初始狀態讓下一位直接點選
-function afterBoardSubmit(){ nextStudent(); }
+function afterBoardSubmit(){ nextStudent(); window.scrollTo(0,0); }
 // 按錯了：撤銷剛剛那一筆，回到「同一位同學、重新選心情」
 async function undoLast(){
   const L=state.lastSubmit; if(!L) return;
@@ -533,8 +533,7 @@ async function submit(){
     $('dEmoji').innerHTML=SELFaces.svg(e.name,110); $('dTitle').textContent=`${KIND[per].icon} ${KIND[per].label}：「${e.name}」（${c.zh}・${c.feel}區）`; $('dMsg').textContent=c.msg;
     $('dTips').innerHTML = c.tips.map(t=>`<li>${t}</li>`).join('') + `<li style="list-style:none;margin-top:6px;color:var(--pri);font-weight:700">${KIND[per].after}</li>`;
     $('dSig').innerHTML = SIGNALS.map((g,i)=>`<div class="sc"><img src="${g.img}" alt="${g.name}" loading="lazy"><b>${i+1}. ${g.name}</b>${g.use}</div>`).join('');
-    if (BOARD()){ afterBoardSubmit(); return; }   // 大螢幕：不顯示任何提示、立刻換下一位
-    $('formView').classList.add('hide'); $('doneView').classList.remove('hide'); window.scrollTo(0,0);
+    afterBoardSubmit();   // 手機與大螢幕都一樣：不顯示任何提示、立刻回到初始畫面
   }catch(e){ $('err').textContent='送出失敗，請檢查網路後再試一次。'; check(); }
   finally { state.busy = false; }
 }
