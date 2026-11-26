@@ -73,8 +73,13 @@ textarea{resize:vertical}
    所有尺寸都乘上 --bs（由 JS 依「目前視窗高度」自動調整），確保整個畫面不用捲動。 */
 .cols{display:block}
 .apx{display:none}
-.toast{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:50;background:#fff;border-radius:28px;padding:26px 44px;text-align:center;min-width:420px;max-width:80vw;box-shadow:0 0 0 100vmax rgba(0,0,0,.38),0 24px 70px rgba(0,0,0,.35);cursor:pointer}
-.toast h2{margin:8px 0 4px;font-size:32px}.toast p{margin:4px 0;font-size:20px;color:var(--mute)}.toast .after{color:var(--pri);font-weight:700}
+.toast{position:fixed;left:50%;top:10px;transform:translateX(-50%);z-index:50;background:#1f2937;color:#fff;border-radius:999px;padding:8px 10px 8px 22px;display:flex;align-items:center;gap:14px;font-size:20px;font-weight:700;white-space:nowrap;box-shadow:0 6px 22px rgba(0,0,0,.28);animation:toastIn .18s ease-out}
+.toast.hide{display:none}
+.toast .tk{font-size:22px}
+.toast .undo{margin:0;font-size:17px;padding:7px 16px;border-radius:999px;border:0;background:#fff;color:#1f2937}
+@keyframes toastIn{from{opacity:0;transform:translateX(-50%) translateY(-12px)}to{opacity:1;transform:translateX(-50%)}}
+.tile.pulse{animation:pulseTile 1.1s ease-out}
+@keyframes pulseTile{0%{box-shadow:0 0 0 0 rgba(16,185,129,.75);background:#d1fae5}100%{box-shadow:0 0 0 22px rgba(16,185,129,0)}}
 body.board .wrap{max-width:1700px;padding:calc(14px*var(--bs,1)) 28px calc(16px*var(--bs,1))}
 body.board h1{font-size:calc(36px*var(--bs,1));margin:0}
 body.board .sub{font-size:calc(18px*var(--bs,1));margin-bottom:calc(8px*var(--bs,1))}
@@ -105,8 +110,6 @@ body.board .egrid.compact{--fs:72px}
 body.board .tier{margin:calc(6px*var(--bs,1)) 0 0;font-size:calc(14px*var(--bs,1))}
 body.board .egrid-note{display:none}
 body.board .sendRow{display:flex;gap:14px;align-items:stretch}
-body.board .sendRow .card{flex:1;margin:0}
-body.board .sendRow textarea{font-size:calc(20px*var(--bs,1));padding:calc(10px*var(--bs,1));height:calc(64px*var(--bs,1))}
 body.board .sendRow .go{flex:0 0 calc(310px*var(--bs,1));font-size:calc(28px*var(--bs,1));margin:0;border-radius:22px}
 body.board .aconf .big{width:210px;height:210px}
 body.board .apick{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);width:min(940px,94vw);max-height:88vh;overflow:auto;z-index:40;margin:0;box-shadow:0 0 0 100vmax rgba(0,0,0,.45),0 24px 70px rgba(0,0,0,.4);border:3px solid #fff}
@@ -115,7 +118,7 @@ body.board .agrid{grid-template-columns:repeat(auto-fill,minmax(104px,1fr));gap:
 body.board .apick .sub{padding-right:52px}   /* 讓說明文字不被右上角的關閉鈕壓到 */
 .phint.flash{animation:flash .45s 3}
 @keyframes flash{0%,100%{background:#fff}50%{background:#fde68a}}
-body.auto .go{display:none}
+body.auto .go,body.auto .sendRow{display:none}
 .undo{margin-top:12px;font-family:inherit;font-size:20px;font-weight:700;border:2px solid #cbd5e1;background:#fff;color:#374151;border-radius:14px;padding:10px 20px;cursor:pointer}
 .undo:hover{background:#f1f5f9}
 .done-view{text-align:center}
@@ -163,15 +166,10 @@ body.auto .go{display:none}
       </div>
       <div class="colR">
         <div class="sendRow">
-    <div class="card">
-      <p class="step"><span>2</span><i id="stp3" style="font-style:normal">想多說一點嗎？（可以不寫）</i></p>
-      <textarea id="note" rows="2" maxlength="120" placeholder="例如：和朋友吵架了……"></textarea>
-    </div>
-
     <button class="go" id="send" disabled>送出心情 ✔</button>
         </div>
     <div class="card">
-      <p class="step"><span>3</span><i id="stp2" style="font-style:normal">此刻，我的心情是哪一個？</i></p>
+      <p class="step"><span>2</span><i id="stp2" style="font-style:normal">此刻，我的心情是哪一個？</i></p>
       <div class="phint" id="phint"></div>
       <div id="emotions"></div>
     </div>
@@ -288,7 +286,7 @@ function applyStyle(g){
   const cname = state.cls ? (GRADE_ZH[state.grade]||'') + state.cls.slice(String(state.grade).length) : '';
   $('ttl').textContent = st.title.replace('{c}', cname);
   document.title = cname ? `${cname}心情 Check-in` : '我的心情簽到';
-   $('stp1').textContent = st.s1; $('stp3').textContent = st.s3 + (AUTO ? '（要寫的話，先寫再點心情）' : '');
+   $('stp1').textContent = st.s1;
   applyKind();
 }
 const tierOf = g => g<=2 ? 1 : g<=4 ? 2 : 3;
@@ -444,13 +442,15 @@ function renderEmotions(){
 }
 function check(){ $('send').disabled = !(state.cls && state.seat && state.emo); }
 let toastTimer=null;
-function showToast(e, c, per){
+// 大螢幕送出後：畫面立刻回到初始狀態讓下一位直接點選；頂端只留一條細提示（不顯示心情內容、不擋任何按鈕），5 秒後自動消失
+function showToast(seat, per){
   const K=KIND[per];
-  $('toast').innerHTML = `<div class="bigface">${SELFaces.svg(e.name,120)}</div><h2>${state.seat} 號　${K.icon} ${K.label} 完成！</h2><p>你選了「${e.name}」（${c.zh}・${c.feel}區）</p><p>${c.msg}</p><p class="after">${K.after}</p><button class="undo" id="toastUndo">↩︎ 按錯了，重選</button>`;
+  $('toast').innerHTML = `<span><span class="tk">✓</span> ${seat} 號　${K.icon} ${K.label} 完成</span><button class="undo" id="toastUndo">↩︎ 按錯了</button>`;
   $('toast').classList.remove('hide');
   $('toastUndo').onclick = ev => { ev.stopPropagation(); undoLast(); };
-  const done = () => { clearTimeout(toastTimer); $('toast').classList.add('hide'); nextStudent(); };
-  $('toast').onclick = done; toastTimer = setTimeout(done, 4500);
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => $('toast').classList.add('hide'), 5000);
+  nextStudent();                                              // 立刻換下一位
+  const t=document.querySelector('.tile[data-s="'+seat+'"]'); if(t){ t.classList.add('pulse'); }   // 剛送出的座號閃一下綠色
 }
 // 按錯了：撤銷剛剛那一筆，回到「同一位同學、重新選心情」
 async function undoLast(){
@@ -473,7 +473,7 @@ async function undoLast(){
 }
 // 回到初始狀態，讓下一位同學直接點座號
 function nextStudent(){
-  state.seat=null; state.emo=null; state.kind='ci'; $('note').value=''; $('hello').textContent=''; $('err').textContent='';
+  state.seat=null; state.emo=null; state.kind='ci'; $('hello').textContent=''; $('err').textContent='';
   $('apick').classList.add('hide');
   document.querySelectorAll('.ecard').forEach(x=>x.classList.remove('sel','dim'));
   applyKind(); renderTiles(); check();
@@ -487,9 +487,8 @@ async function submit(){
   state.busy = true; $('send').disabled = true; $('err').textContent='';
   try{
     const e = state.emo;
-    const r = await api('checkin',{cls:state.cls, seat:state.seat, color:e.color, emotion:e.em+' '+e.name, note:$('note').value.trim()});
+    const r = await api('checkin',{cls:state.cls, seat:state.seat, color:e.color, emotion:e.em+' '+e.name, note:''});
     if (!r.ok) throw new Error(r.error||'fail');
-    $('note').value='';
     const per = r.kind || state.kind;   // 以後端判定為準（當天第一次＝Check-in，第二次起＝Check-out）
     state.lastSubmit = {cls:state.cls, seat:state.seat, per};   // 供「按錯了」撤銷
     (state.done[per] = state.done[per]||[]).includes(state.seat) || state.done[per].push(state.seat);
@@ -497,7 +496,7 @@ async function submit(){
     $('dEmoji').innerHTML=SELFaces.svg(e.name,110); $('dTitle').textContent=`${KIND[per].icon} ${KIND[per].label}：「${e.name}」（${c.zh}・${c.feel}區）`; $('dMsg').textContent=c.msg;
     $('dTips').innerHTML = c.tips.map(t=>`<li>${t}</li>`).join('') + `<li style="list-style:none;margin-top:6px;color:var(--pri);font-weight:700">${KIND[per].after}</li>`;
     $('dSig').innerHTML = SIGNALS.map((g,i)=>`<div class="sc"><img src="${g.img}" alt="${g.name}" loading="lazy"><b>${i+1}. ${g.name}</b>${g.use}</div>`).join('');
-    if (BOARD()){ showToast(e, c, per); return; }   // 大螢幕：短暫提示後自動換下一位，不切換頁面
+    if (BOARD()){ showToast(state.seat, per); return; }   // 大螢幕：不跳大視窗、立刻換下一位
     $('formView').classList.add('hide'); $('doneView').classList.remove('hide'); window.scrollTo(0,0);
   }catch(e){ $('err').textContent='送出失敗，請檢查網路後再試一次。'; check(); }
   finally { state.busy = false; }
