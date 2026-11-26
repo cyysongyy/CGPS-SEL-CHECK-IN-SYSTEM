@@ -93,6 +93,11 @@ body.board .tile .nm{font-size:calc(18px*var(--bs,1))}
 body.board .tile .av{width:calc(92px*var(--bs,1));height:calc(92px*var(--bs,1));margin-top:calc(4px*var(--bs,1));font-size:calc(34px*var(--bs,1))}
 body.board .tile.done{padding-bottom:calc(22px*var(--bs,1))}
 body.board .tile .dn{font-size:calc(12px*var(--bs,1))}
+.tile .dn.mv{display:flex;align-items:center;justify-content:center;gap:2px;padding:2px 0;font-size:12px}
+.tile .dn.mv svg{display:block}
+.tile .dn.mv.improved{background:#d1fae5;color:#047857}.tile .dn.mv.same{background:#e0f2fe;color:#0369a1}
+.tile .dn.mv.shifted{background:#fef3c7;color:#92400e}.tile .dn.mv.worsened{background:#fee2e2;color:#b91c1c}
+body.board .tile.done.hasmv{padding-bottom:calc(40px*var(--bs,1))}
 body.board .avc{width:calc(68px*var(--bs,1));height:calc(68px*var(--bs,1))}
 body.board .hello{display:none;font-size:calc(26px*var(--bs,1));margin-top:calc(8px*var(--bs,1));min-height:calc(30px*var(--bs,1))}
 body.board .phint{font-size:calc(22px*var(--bs,1));padding:calc(10px*var(--bs,1));margin-bottom:calc(10px*var(--bs,1))}
@@ -383,10 +388,21 @@ async function loadClass(){
   try{ const r = await api('roster',{cls:state.cls}); state.roster=(r.roster||[]).sort((a,b)=>a.seat-b.seat); state.done=doneOf(r.done); }catch(e){}
   renderTiles(); check();
 }
+/* 今天的心情變化：只記在「這台裝置」（大螢幕），不經後端、不對其他裝置公開；兩次都完成後在座號格顯示 😊→😠 */
+const moodKey=()=>'sel_mood_'+state.cls+'_'+todayStr();
+function moods(){ return store.get(moodKey(),{}); }
+function setMood(seat,kind,emoName){ const m=moods(); (m[seat]=m[seat]||{})[kind]=emoName; store.set(moodKey(),m); }
+function dropMood(seat,kind){ const m=moods(); if(m[seat]){ delete m[seat][kind]; store.set(moodKey(),m); } }
+const zoneOf=n=>{ const e=EMOTIONS.find(x=>x.name===n); return e?e.color:''; };
+const chgOf=(a,b)=>{ const x=zoneOf(a), y=zoneOf(b); return x===y?'same':y==='green'?'improved':x==='green'?'worsened':'shifted'; };
+function moveLabel(seat){
+  const m=(moods()[seat])||{}; if(!m.ci||!m.co||!(state.done.co||[]).includes(seat)) return '';
+  return `<span class="dn mv ${chgOf(m.ci,m.co)}">${SELFaces.svg(m.ci,30)}<b>→</b>${SELFaces.svg(m.co,30)}</span>`;
+}
 function renderTiles(){
   if (!state.roster.length){ $('tiles').innerHTML='<div class="sub">這個班級還沒有名單，請老師先匯入。</div>'; return; }
   $('tiles').innerHTML = state.roster.map(r=>
-    `<button class="tile ${(state.done.ci||[]).includes(r.seat)||(state.done.co||[]).includes(r.seat)?'done':''} ${state.seat===r.seat?'sel':''} ${failedSeats.has(r.seat)?'failed':''}" data-s="${r.seat}"><span class="no">${r.seat}</span><span class="nm">號</span>${r.avatar?`<span class="av" style="--abg:${abg(r.seat)}">${SELAnimals.html(r.avatar,66)}</span>`:'<span class="av ph">＋</span>'}${(!r.avatar&&BOARD())?'<span class="avbtn" title="選動物">🎨</span>':''}${(state.done.co||[]).includes(r.seat)?'<span class="dn">✓✓ 今日完成</span>':(state.done.ci||[]).includes(r.seat)?'<span class="dn">✓ 已Check-in</span>':''}</button>`).join('');
+    `<button class="tile ${(state.done.ci||[]).includes(r.seat)||(state.done.co||[]).includes(r.seat)?'done':''} ${moveLabel(r.seat)?'hasmv':''} ${state.seat===r.seat?'sel':''} ${failedSeats.has(r.seat)?'failed':''}" data-s="${r.seat}"><span class="no">${r.seat}</span><span class="nm">號</span>${r.avatar?`<span class="av" style="--abg:${abg(r.seat)}">${SELAnimals.html(r.avatar,66)}</span>`:'<span class="av ph">＋</span>'}${(!r.avatar&&BOARD())?'<span class="avbtn" title="選動物">🎨</span>':''}${(state.done.co||[]).includes(r.seat)?(moveLabel(r.seat)||'<span class="dn">✓✓ 今日完成</span>'):(state.done.ci||[]).includes(r.seat)?'<span class="dn">✓ 已Check-in</span>':''}</button>`).join('');
   $('tiles').onclick = e => { const b=e.target.closest('.tile'); if(!b) return;
     state.seat=+b.dataset.s; state.kind=nextKind(); applyKind();
     showHello(); renderTiles();
@@ -485,12 +501,12 @@ function submitFast(){
   const e=state.emo, seat=state.seat; if(!e||!seat) return;
   const guess=nextKind();                                   // 預測是 Check-in 還是 Check-out（實際以後端為準）
   (state.done[guess]=state.done[guess]||[]).includes(seat)||state.done[guess].push(seat);
-  failedSeats.delete(seat);
+  failedSeats.delete(seat); setMood(seat,guess,e.name);
   sendQueue.push({payload:{cls:state.cls,seat,color:e.color,emotion:e.em+' '+e.name,note:'',reqId:newReqId()},seat,guess,tries:0});
   nextStudent();                                            // 立刻換下一位
   pump();
 }
-function failFor(it){ state.done[it.guess]=(state.done[it.guess]||[]).filter(x=>x!==it.seat); failedSeats.add(it.seat); renderTiles(); }
+function failFor(it){ dropMood(it.seat,it.guess); state.done[it.guess]=(state.done[it.guess]||[]).filter(x=>x!==it.seat); failedSeats.add(it.seat); renderTiles(); }
 function warn(){
   const w=$('netwarn'), retrying=sendQueue.some(i=>i.tries>0), f=[...failedSeats];
   if(!retrying&&!f.length){ w.classList.add('hide'); return; }
@@ -505,6 +521,7 @@ async function pump(){
     if(r && r.ok){
       sendQueue.shift(); failedSeats.delete(it.seat);
       if(r.kind && r.kind!==it.guess){                       // 伺服器判定與預測不同（例如另一台裝置也簽到過）：校正標記
+        { const nm=(moods()[it.seat]||{})[it.guess]; dropMood(it.seat,it.guess); if(nm) setMood(it.seat,r.kind,nm); }
         state.done[it.guess]=(state.done[it.guess]||[]).filter(x=>x!==it.seat);
         (state.done[r.kind]=state.done[r.kind]||[]).includes(it.seat)||state.done[r.kind].push(it.seat); renderTiles(); }
     } else if (r && r.error) { sendQueue.shift(); failFor(it); }   // 伺服器明確拒絕（不是網路問題）：不重試
@@ -528,7 +545,7 @@ async function submit(){
     if (!r.ok) throw new Error(r.error||'fail');
     const per = r.kind || state.kind;   // 以後端判定為準（當天第一次＝Check-in，第二次起＝Check-out）
     state.lastSubmit = {cls:state.cls, seat:state.seat, per};   // 供「按錯了」撤銷
-    (state.done[per] = state.done[per]||[]).includes(state.seat) || state.done[per].push(state.seat);
+    (state.done[per] = state.done[per]||[]).includes(state.seat) || state.done[per].push(state.seat); setMood(state.seat,per,e.name);
     const c = COLORS[e.color];
     $('dEmoji').innerHTML=SELFaces.svg(e.name,110); $('dTitle').textContent=`${KIND[per].icon} ${KIND[per].label}：「${e.name}」（${c.zh}・${c.feel}區）`; $('dMsg').textContent=c.msg;
     $('dTips').innerHTML = c.tips.map(t=>`<li>${t}</li>`).join('') + `<li style="list-style:none;margin-top:6px;color:var(--pri);font-weight:700">${KIND[per].after}</li>`;
