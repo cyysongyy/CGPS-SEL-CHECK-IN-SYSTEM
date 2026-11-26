@@ -365,23 +365,32 @@ function doPost(e) {
     var b = JSON.parse(e.postData.contents), a = b.action;
     if (a === 'checkin') {
       if (COLORS.indexOf(b.color) < 0) return out_({ ok: false, error: 'bad color' });
+      // 冪等：前端網路不穩而重試時會帶同一個 reqId，同一筆只寫入一次（避免回應遺失時被誤當成第二次簽到）
+      var rid = str_(b.reqId, 40), rcache = CacheService.getScriptCache();
+      if (rid) { var prevRes = rcache.get('rq|' + rid); if (prevRes) return out_(JSON.parse(prevRes)); }
       var cls = str_(b.cls, 10), seat = Number(b.seat);
       var me = rosterOf_(cls).filter(function (r) { return r.seat === seat; })[0];
       var name = me ? me.name : str_(b.name, 20);
       // 不論時間，只看順序：學生當天第一次送出＝Check-in，第二次起＝Check-out（第三次以後視為更正 Check-out，
       // 統計取最新一筆）。以後端紀錄為準，不採用前端傳來的任何類型。
+      // 為了加快回應，只讀試算表「最後 400 列」（今天的紀錄一定在最後面），不再讀整張表。
+      var csh = sheet_('Checkins'), last = csh.getLastRow(), ncol = Math.max(csh.getLastColumn(), 1);
+      var hdr = csh.getRange(1, 1, 1, ncol).getValues()[0];
+      var cC = hdr.indexOf('班級'), cS = hdr.indexOf('座號'), cD = hdr.indexOf('日期');
+      var from = Math.max(2, last - 399), tail = last >= 2 ? csh.getRange(from, 1, last - from + 1, ncol).getValues() : [];
       var seenToday = 0, dd = today_();
-      rows_('Checkins').forEach(function (r) {
-        if (String(r['班級']) === cls && Number(r['座號']) === seat && dateStr_(r['日期']) === dd) seenToday++;
+      tail.forEach(function (r) {
+        if (String(r[cC]) === cls && Number(r[cS]) === seat && dateStr_(r[cD]) === dd) seenToday++;
       });
       var kind = seenToday === 0 ? 'ci' : 'co';
-      var csh = sheet_('Checkins'), hdr = csh.getDataRange().getValues()[0];
       try { if (hdr.indexOf('類型') < 0) csh.getRange(1, hdr.length + 1).setValue('類型'); } catch (hdrErr) {}   // 舊試算表自動補上「類型」標題欄（失敗也不影響簽到）
       csh.appendRow([Utilities.getUuid(), now_(), today_(), cls, seat, name,
         b.color, str_(b.emotion, 30), str_(b.note, 200), KIND_ZH_[kind]]);
+      var res = { ok: true, kind: kind };
+      if (rid) rcache.put('rq|' + rid, JSON.stringify(res), 600);   // 先記下結果，再寄信（寄信較慢，萬一逾時重試也不會重複寫入）
       // 即時通知導師（寄信失敗不影響簽到）
       try { alertTeachers_(cls, seat, name, b.color, str_(b.emotion, 30), !!str_(b.note, 200), kind); } catch (mailErr) {}
-      return out_({ ok: true, kind: kind });
+      return out_(res);
     }
     if (a === 'setAvatar') {   // 學生自選圖案（自我圖式）
       var av = str_(b.avatar, 8);
