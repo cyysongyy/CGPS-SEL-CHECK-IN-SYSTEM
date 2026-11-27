@@ -25,6 +25,8 @@ select,textarea{width:100%;font-size:18px;padding:12px;border:2px solid var(--li
 .tile .no{display:block;font-size:28px;font-weight:800;color:var(--pri);line-height:1.1}
 .tile .nm{display:block;font-size:16px;margin-top:2px}
 .tile.sel{border-color:var(--pri);background:#eef2ff;transform:scale(1.04)}
+.nudge{margin-top:10px;text-align:center;color:#9a6b00;font-size:14px}
+body.board .nudge{font-size:calc(16px*var(--bs,1))}
 .tile .dn{position:absolute;left:0;right:0;bottom:-1px;font-size:11px;color:#047857;background:#d1fae5;border-radius:0 0 12px 12px;padding:1px 0}
 .tile.done{padding-bottom:20px}
 .tile .av{display:flex;width:70px;height:70px;margin:6px auto 0;border-radius:50%;align-items:center;justify-content:center;font-size:29px;line-height:1;background:var(--abg,#FFF4C7)}
@@ -161,6 +163,7 @@ body.auto .go,body.auto .sendRow{display:none}
       </div>
       <div style="height:10px"></div>
       <div class="tiles" id="tiles"></div>
+      <div class="nudge hide" id="nudge" role="status"></div>
       <div class="hello" id="hello"></div>
       <div class="apick hide" id="apick"><button class="apx" id="apx" type="button" aria-label="關閉">✕</button><div class="sub" style="margin:0"><b>🎨 選一隻你喜歡的動物，代表自己！</b>（每個號碼只能選一次，選了就固定；每隻動物只能一位同學用，灰色的已被選走）</div><div class="agrid" id="agrid"></div><div class="aconf hide" id="aconf"></div></div>
     </div>
@@ -351,7 +354,7 @@ function isSchoolDay(){
 function init(){
   $('today').textContent = new Date().toLocaleDateString('zh-TW',{year:'numeric',month:'long',day:'numeric',weekday:'long'});
   if (DEMO) $('demo').classList.remove('hide');
-  if (!isSchoolDay()){ $('formView').classList.add('hide'); $('closedView').classList.remove('hide'); return; }
+  if (DEMO && !isSchoolDay()){ $('formView').classList.add('hide'); $('closedView').classList.remove('hide'); return; }   // 有後端時，上課日以後端 Calendar 分頁為準（見 loadClass）
 
   $('grade').innerHTML = '<option value="">年級</option>'+GRADES.map(g=>`<option value="${g}">${GRADE_ZH[g]}年級</option>`).join('');
   $('klass').innerHTML = CLASS_NAMES.map(c=>`<option value="${c}">${c}班</option>`).join('');
@@ -385,7 +388,11 @@ async function loadClass(){
   if (!state.cls){ $('tiles').innerHTML='<div class="sub">請先選年級</div>'; check(); return; }
   store.set('sel_class',state.cls);
   $('tiles').innerHTML='<div class="sub">載入中…</div>';
-  try{ const r = await api('roster',{cls:state.cls}); state.roster=(r.roster||[]).sort((a,b)=>a.seat-b.seat); state.done=doneOf(r.done); }catch(e){}
+  let closed=false;
+  try{ const r = await api('roster',{cls:state.cls}); state.roster=(r.roster||[]).sort((a,b)=>a.seat-b.seat); state.done=doneOf(r.done);
+       closed = (r && r.schoolDay!==undefined) ? !r.schoolDay : !isSchoolDay();   // 後端沒回報就用本機的週一至週五判斷
+  }catch(e){ closed = !isSchoolDay(); }
+  if (closed){ $('formView').classList.add('hide'); $('closedView').classList.remove('hide'); return; }   // 週末、放假日（Calendar 分頁）：顯示「今天不用簽到」
   renderTiles(); check();
 }
 /* 今天的心情變化：只記在「這台裝置」（大螢幕），不經後端、不對其他裝置公開；兩次都完成後在座號格顯示 😊→😠 */
@@ -399,10 +406,25 @@ function moveLabel(seat){
   const m=(moods()[seat])||{}; if(!m.ci||!m.co||!(state.done.co||[]).includes(seat)) return '';
   return `<span class="dn mv ${chgOf(m.ci,m.co)}">${SELFaces.svg(m.ci,30)}<b>→</b>${SELFaces.svg(m.co,30)}</span>`;
 }
+/* 溫和提醒（只在大螢幕）：上午 9 點後還沒 Check-in 的座號、下午 3:30 後還沒 Check-out 的座號，顯示在名單下方一行小字，不跳視窗、不打斷點選。
+   時間可在 config.js 用 SEL_NUDGE_CI／SEL_NUDGE_CO 調整，SEL_NUDGE=false 可關閉。 */
+function renderNudge(){
+  const el=$('nudge'); if(!el) return;
+  let txt='';
+  if (window.SEL_NUDGE!==false && BOARD() && state.roster.length && $('closedView').classList.contains('hide')){
+    const hm=new Date().toTimeString().slice(0,5), ci=window.SEL_NUDGE_CI||'09:00', co=window.SEL_NUDGE_CO||'15:30';
+    const miss=k=>state.roster.map(r=>r.seat).filter(x=>!(state.done[k]||[]).includes(x));
+    if (hm>=ci && hm<'12:00'){ const m=miss('ci'); if(m.length) txt='⏰ 還沒 Check-in：'+m.join('、')+' 號'; }
+    else if (hm>=co && hm<'18:00'){ const m=miss('co'); if(m.length) txt='⏰ 還沒 Check-out：'+m.join('、')+' 號'; }
+  }
+  el.textContent=txt; el.classList.toggle('hide',!txt);
+}
+setInterval(()=>{ if(state.cls) renderNudge(); }, 60000);
 function renderTiles(){
   if (!state.roster.length){ $('tiles').innerHTML='<div class="sub">這個班級還沒有名單，請老師先匯入。</div>'; return; }
   $('tiles').innerHTML = state.roster.map(r=>
     `<button class="tile ${(state.done.ci||[]).includes(r.seat)||(state.done.co||[]).includes(r.seat)?'done':''} ${moveLabel(r.seat)?'hasmv':''} ${state.seat===r.seat?'sel':''} ${failedSeats.has(r.seat)?'failed':''}" data-s="${r.seat}"><span class="no">${r.seat}</span><span class="nm">號</span>${r.avatar?`<span class="av" style="--abg:${abg(r.seat)}">${SELAnimals.html(r.avatar,66)}</span>`:'<span class="av ph">＋</span>'}${(!r.avatar&&BOARD())?'<span class="avbtn" title="選動物">🎨</span>':''}${(state.done.co||[]).includes(r.seat)?(moveLabel(r.seat)||'<span class="dn">✓✓ 今日完成</span>'):(state.done.ci||[]).includes(r.seat)?'<span class="dn">✓ 已Check-in</span>':''}</button>`).join('');
+  renderNudge();
   $('tiles').onclick = e => { const b=e.target.closest('.tile'); if(!b) return;
     state.seat=+b.dataset.s; state.kind=nextKind(); applyKind();
     showHello(); renderTiles();
