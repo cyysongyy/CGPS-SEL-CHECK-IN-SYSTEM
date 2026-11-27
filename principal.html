@@ -82,6 +82,7 @@ th,td{text-align:left;padding:7px 6px;border-bottom:1px solid var(--line);vertic
   </div>
 </div>
 
+<script src="mask.js"></script>
 <script src="faces.js"></script>
 <script src="animals.js"></script>
 <script src="stats.js"></script>
@@ -234,7 +235,7 @@ function render(){
   data.classes.forEach(c=>c.students.forEach(s=>{total++;cnt[s.color||'none']++}));
   $('stats').innerHTML=`<div class="chip all"><b>${total}</b>全校人數</div><div class="chip red"><b>${cnt.red}</b>🔴 生氣</div><div class="chip blue"><b>${cnt.blue}</b>🔵 沮喪</div><div class="chip yellow"><b>${cnt.yellow}</b>🟡 焦慮</div><div class="chip green"><b>${cnt.green}</b>🟢 平和</div><div class="chip none"><b>${cnt.none}</b>⚪ 未簽到</div>`;
   const urgent=[];data.classes.forEach(c=>c.students.forEach(s=>{if(need(s))urgent.push({cls:c.cls,...s})}));
-  $('alerts').innerHTML=urgent.length?`<div class="alert"><b>🚨 優先關心（尚未處遇）：${urgent.length} 位</b>`+urgent.map(s=>`<div>${clsLabel(s.cls)} ${s.seat}號 <b>${esc(s.name)}</b>　<span class="dot ${s.color}"></span>${s.emotion?SELFaces.html(s.emotion,22):esc(COLOR[s.color])}${s.note?'　💬 '+esc(s.note):''}</div>`).join('')+'</div>':'';
+  $('alerts').innerHTML=urgent.length?`<div class="alert"><b>🚨 優先關心（尚未處遇）：${urgent.length} 位</b>`+urgent.map(s=>`<div>${clsLabel(s.cls)} ${s.seat}號 <b>${esc(SELMask(s.name))}</b>　<span class="dot ${s.color}"></span>${s.emotion?SELFaces.html(s.emotion,22):esc(COLOR[s.color])}${s.note?'　💬 '+esc(s.note):''}</div>`).join('')+'</div>':'';
   $('classes').innerHTML=data.classes.map(c=>{
     const n=c.students.length,k={red:0,blue:0,yellow:0,green:0};let done=0;
     c.students.forEach(s=>{if(s.color){k[s.color]++;done++}});
@@ -245,7 +246,7 @@ function render(){
   $('classes').onclick=e=>{const c=e.target.closest('.cc');if(c){openCls=openCls===c.dataset.c?'':c.dataset.c;render()}};
   const oc=data.classes.find(c=>c.cls===openCls);
   $('detail').innerHTML=oc?`<div class="detail"><b>${clsLabel(oc.cls)}（${esc($('date').value)}）</b> <button id="clrCls" style="margin-left:10px;background:#fee2e2;color:#991b1b">🗑 清除此班當天資料</button><table><tr><th>座號</th><th>姓名</th><th>👋 Check-in</th><th>🏁 Check-out</th><th>變化</th><th>留言</th><th>處遇</th></tr>`+
-    oc.students.map(s=>`<tr><td>${SELAnimals.html(s.avatar,36)} ${s.seat} <a href="referral.html?cls=${encodeURIComponent(oc.cls)}&seat=${s.seat}" target="_blank" title="輔導轉介摘要" style="text-decoration:none">📋</a></td><td>${esc(s.name)}</td><td>${cell(s.ci)}</td><td>${cell(s.co)}</td><td>${s.change?`<span class="chg ${s.change}">${CHG_ZH[s.change]}${CHG_ICON[s.change]}</span>`:''}</td><td>${esc(s.note||'')}</td><td>${s.fu?esc(s.fu.status)+(s.fu.note?'：'+esc(s.fu.note):''):''}</td></tr>`).join('')+'</table></div>':'';
+    oc.students.map(s=>`<tr><td>${SELAnimals.html(s.avatar,36)} ${s.seat} <a href="referral.html?cls=${encodeURIComponent(oc.cls)}&seat=${s.seat}" target="_blank" title="輔導轉介摘要" style="text-decoration:none">📋</a></td><td>${esc(SELMask(s.name))}</td><td>${cell(s.ci)}</td><td>${cell(s.co)}</td><td>${s.change?`<span class="chg ${s.change}">${CHG_ZH[s.change]}${CHG_ICON[s.change]}</span>`:''}</td><td>${esc(s.note||'')}</td><td>${s.fu?esc(s.fu.status)+(s.fu.note?'：'+esc(s.fu.note):''):''}</td></tr>`).join('')+'</table></div>':'';
   if($('clrCls'))$('clrCls').onclick=()=>clearDay(openCls);
   $('meta').textContent=`${$('date').value} · 更新 ${new Date().toTimeString().slice(0,5)} · 每分鐘自動更新`;
 }
@@ -268,7 +269,7 @@ async function clearDay(cls){
 }
 function exportCsv(){
   const rows=[['班級','日期','座號','姓名','Check-in 顏色','Check-in 情緒','Check-out 顏色','Check-out 情緒','當天變化','備註（最新）','處遇狀態']];
-  data.classes.forEach(c=>c.students.forEach(s=>rows.push([clsLabel(c.cls),data.date,s.seat,s.name,s.ci?COLOR[s.ci.color]:'未簽到',s.ci?s.ci.emotion||'':'',s.co?COLOR[s.co.color]:'未簽到',s.co?s.co.emotion||'':'',s.change?CHG_ZH[s.change]:'',s.note||'',s.fu?s.fu.status:''])));
+  data.classes.forEach(c=>c.students.forEach(s=>rows.push([clsLabel(c.cls),data.date,s.seat,SELMask(s.name),s.ci?COLOR[s.ci.color]:'未簽到',s.ci?s.ci.emotion||'':'',s.co?COLOR[s.co.color]:'未簽到',s.co?s.co.emotion||'':'',s.change?CHG_ZH[s.change]:'',s.note||'',s.fu?s.fu.status:''])));
   const csv='﻿'+rows.map(r=>r.map(v=>'"'+String(v??'').replace(/"/g,'""')+'"').join(',')).join('\n');
   const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));a.download=`SEL_全校_${data.date}.csv`;a.click();
 }

@@ -35,6 +35,7 @@ textarea{width:100%;font:inherit;font-size:15px;border:2px solid var(--line);bor
   <button id="print">🖨 列印／存成 PDF</button><button onclick="window.close()">關閉</button></div>
 <div id="out"><div class="err" style="color:#64748b">產生中…</div></div>
 <script src="config.js"></script>
+<script src="mask.js"></script>
 <script src="faces.js"></script>
 <script>
 const GAS_URL=window.SEL_GAS_URL||'', DEMO=!GAS_URL||GAS_URL.startsWith('YOUR_');
@@ -91,7 +92,7 @@ async function build(){
     <h1>學生情緒簽到摘要（輔導轉介用）</h1>
     <div class="mute">辰光國小 · 產生日期 ${esc(today)} · 統計期間：近 ${days} 天（${dates.length?esc(dates[0])+' ～ '+esc(dates[dates.length-1]):'無簽到'}）</div>
     <h2>基本資料</h2>
-    <div class="kv"><div><b>${esc(clsLabel(cls))} ${seat} 號</b><span>班級座號</span></div><div><b>${esc(me.name||'（未登錄姓名）')}</b><span>姓名</span></div><div><b>${dates.length} 天／${n} 次</b><span>簽到天數／次數</span></div></div>
+    <div class="kv"><div><b>${esc(clsLabel(cls))} ${seat} 號</b><span>班級座號</span></div><div><b>${esc(me.name?SELMask(me.name):'（未登錄姓名）')}</b><span>姓名</span></div><div><b>${dates.length} 天／${n} 次</b><span>簽到天數／次數</span></div></div>
     <div class="sec"><h2>情緒分布</h2>
     ${n?`<div class="dist">${['red','blue','yellow','green'].map(k=>cnt[k]?`<i style="width:${cnt[k]/n*100}%;background:${COL[k]}"></i>`:'').join('')}</div>
     <div class="leg">${['red','blue','yellow','green'].map(k=>`<span><i style="background:${COL[k]}"></i>${ZH[k]} ${cnt[k]} 次（${pct(cnt[k])}）</span>`).join('')}</div>

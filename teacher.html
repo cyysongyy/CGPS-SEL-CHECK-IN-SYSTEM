@@ -88,6 +88,7 @@ textarea.roster{height:240px}
 </div>
 <div id="modal" class="modal hide"><div id="modalBody"></div></div>
 
+<script src="mask.js"></script>
 <script src="faces.js"></script>
 <script src="animals.js"></script>
 <script src="stats.js"></script>
@@ -248,14 +249,14 @@ function render(){
   $('stats').innerHTML=chip('all','全部',L.length)+chip('red','🔴 生氣',cnt.red)+chip('blue','🔵 沮喪',cnt.blue)+chip('yellow','🟡 焦慮',cnt.yellow)+chip('green','🟢 平和',cnt.green)+chip('none','⚪ 未簽到',cnt.none);
   $('stats').onclick=e=>{const c=e.target.closest('.chip');if(c){filter=c.dataset.f;render()}};
   const urgent=L.filter(s=>s.c&&(s.c.color==='red'||(s.c.color==='blue'&&s.c.note))&&!s.fu);
-  $('alerts').innerHTML=urgent.length?`<div class="alert">🚨 <b>優先關心（尚未處遇）：</b>${urgent.map(s=>esc(s.seat+'號'+s.name)).join('、')}</div>`:'';
+  $('alerts').innerHTML=urgent.length?`<div class="alert">🚨 <b>優先關心（尚未處遇）：</b>${urgent.map(s=>esc(s.seat+'號'+SELMask(s.name))).join('、')}</div>`:'';
   // 今日心情變化（Check-in → Check-out）
   const both=L.filter(s=>s.change), kc={improved:0,same:0,shifted:0,worsened:0}; both.forEach(s=>kc[s.change]++);
   const ciN=L.filter(s=>s.ci).length, coN=L.filter(s=>s.co).length;
   const moved=both.filter(s=>s.change!=='same').sort((a,b)=>({worsened:0,shifted:1,improved:2})[a.change]-({worsened:0,shifted:1,improved:2})[b.change]);
   $('changeBox').innerHTML=`<div class="cbox"><h4>🔄 今日心情變化（Check-in → Check-out）<span class="mute"> Check-in ${ciN} 人・Check-out ${coN} 人</span></h4>`+
     (both.length?`<div class="sum">${['improved','same','shifted','worsened'].map(k=>`<span class="chg ${k}" style="font-size:13px;padding:3px 10px">${CHG_ZH[k]} ${kc[k]}</span>`).join('')}</div>`+
-      moved.map(s=>`<div class="row"><b>${SELAnimals.html(s.avatar,34)} ${s.seat}號 ${esc(s.name)}</b> 👋${mini(s.ci,24)} → 🏁${mini(s.co,24)} <span class="chg ${s.change}">${CHG_ZH[s.change]}${CHG_ICON[s.change]}</span></div>`).join('')
+      moved.map(s=>`<div class="row"><b>${SELAnimals.html(s.avatar,34)} ${s.seat}號 ${esc(SELMask(s.name))}</b> 👋${mini(s.ci,24)} → 🏁${mini(s.co,24)} <span class="chg ${s.change}">${CHG_ZH[s.change]}${CHG_ICON[s.change]}</span></div>`).join('')
       :'<div class="mute">還沒有同學完成 Check-in 和 Check-out，Check-out 後這裡會顯示心情變化。</div>')+'</div>';
   $('meta').textContent=`${clsLabel(cls)} · ${$('date').value} · 已簽到 ${L.length-cnt.none}/${L.length} · 更新 ${new Date().toTimeString().slice(0,5)}`;
   const shown=L.filter(s=>filter==='all'||(filter==='none'?!s.c:s.c&&s.c.color===filter))
@@ -264,7 +265,7 @@ function render(){
     const col=s.c?s.c.color:'';
     return `<div class="s ${col} ${s.c&&s.c.color==='red'&&!s.fu?'urgent':''}" data-seat="${s.seat}">
       ${s.c&&s.c.note?'<span class="badge">💬</span>':''}
-      <div class="top"><span>${SELAnimals.html(s.avatar,36)} ${s.seat}號</span><span>${esc(s.name)}</span></div>
+      <div class="top"><span>${SELAnimals.html(s.avatar,36)} ${s.seat}號</span><span>${esc(SELMask(s.name))}</span></div>
       ${s.c?`<div class="g">${COLOR[col].zh}</div><div class="pm2"><span title="Check-in">👋</span>${mini(s.ci)}<span class="arr">→</span><span title="Check-out">🏁</span>${mini(s.co)}${s.change?`<span class="chg ${s.change}">${CHG_ZH[s.change]}${CHG_ICON[s.change]}</span>`:''}</div>`:'<div class="g"><span class="mute">尚未簽到</span></div>'}
       ${s.c&&s.c.note?`<div class="n">${esc(s.c.note)}</div>`:''}
       ${s.fu?`<div class="st">✓ ${esc(s.fu.status)}</div>`:''}</div>`}).join('')||'<div class="mute">沒有符合的學生</div>';
@@ -274,13 +275,13 @@ function render(){
 /* 學生詳情 + 處遇紀錄 */
 async function openStudent(seat){
   const s=latest().find(x=>x.seat===seat);
-  showModal(`<h3>${seat}號 ${esc(s.name)}</h3><div class="mute">載入歷史中…</div>`);
+  showModal(`<h3>${seat}號 ${esc(SELMask(s.name))}</h3><div class="mute">載入歷史中…</div>`);
   let h={history:[],followups:[]};
   try{h=await get({action:'history',cls,seat,days:14})}catch(e){}
   const byDay={};(h.history||[]).forEach(x=>{byDay[x.date]=x});
   const days=[...Array(14)].map((_,i)=>{const d=new Date();d.setDate(d.getDate()-13+i);return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')});
   const notes=(h.history||[]).filter(x=>x.note).slice(-5).reverse();
-  showModal(`<h3>${seat}號 ${esc(s.name)}</h3>
+  showModal(`<h3>${seat}號 ${esc(SELMask(s.name))}</h3>
     ${['ci','co'].map(p=>{const x=s[p];return `<div style="margin-top:6px">${PER[p]}：${x?`<b>${COLOR[x.color].zh}</b> ${SELFaces.html(x.emotion||'',22)}`:'<span class="mute">尚未簽到</span>'}</div>${x&&x.note?`<div style="background:#f3f4f6;padding:8px;border-radius:8px;margin-top:4px">💬 ${esc(x.note)}</div>`:''}`}).join('')}
     ${s.avatar?`<div style="margin-top:8px">代表圖案：<span style="font-size:26px">${SELAnimals.html(s.avatar,56)}</span> <button class="btn g" id="avReset" style="padding:4px 10px;font-size:13px">重設圖案</button> <span class="mute">重設後學生可以重新選一次</span></div>`:''}
     ${s.change?`<div style="margin-top:8px">今日變化：<span class="chg ${s.change}" style="font-size:13px;padding:3px 10px">${CHG_ZH[s.change]}${CHG_ICON[s.change]}</span></div>`:''}
@@ -321,7 +322,7 @@ function rosterEditor(){
 }
 function exportCsv(){
   const rows=[['班級','日期','座號','姓名','Check-in 顏色','Check-in 情緒','Check-out 顏色','Check-out 情緒','當天變化','備註（最新）','處遇狀態']];
-  latest().forEach(s=>rows.push([cls,$('date').value,s.seat,s.name,s.ci?COLOR[s.ci.color].zh:'未簽到',s.ci?(s.ci.emotion||''):'',s.co?COLOR[s.co.color].zh:'未簽到',s.co?(s.co.emotion||''):'',s.change?CHG_ZH[s.change]:'',s.c?s.c.note:'',s.fu?s.fu.status:'']));
+  latest().forEach(s=>rows.push([cls,$('date').value,s.seat,SELMask(s.name),s.ci?COLOR[s.ci.color].zh:'未簽到',s.ci?(s.ci.emotion||''):'',s.co?COLOR[s.co.color].zh:'未簽到',s.co?(s.co.emotion||''):'',s.change?CHG_ZH[s.change]:'',s.c?s.c.note:'',s.fu?s.fu.status:'']));
   const csv='﻿'+rows.map(r=>r.map(v=>'"'+String(v??'').replace(/"/g,'""')+'"').join(',')).join('\n');
   const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));a.download=`SEL_${cls}_${$('date').value}.csv`;a.click();
 }

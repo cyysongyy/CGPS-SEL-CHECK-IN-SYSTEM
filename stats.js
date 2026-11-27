@@ -5,6 +5,7 @@
   const ZH={red:'紅·生氣',blue:'藍·沮喪',yellow:'黃·焦慮',green:'綠·平和'};
   const GRADE_ZH=['','一','二','三','四','五','六'];
   const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const mk=n=>window.SELMask?SELMask(n):n;   // 學生姓名一律遮罩顯示
   const pct=x=>Math.round((x||0)*100)+'%';
   const clsLabel=c=>(GRADE_ZH[c[0]]||c[0])+'年'+c.slice(1)+'班';
 
@@ -118,14 +119,14 @@
   function watch(d,showCls){
     const w=d.watch||[];
     return `<div class="st-card"><h3>🔎 持續關注學生（${w.length} 位）</h3>`+(w.length?`<table class="st-t"><tr>${showCls?'<th>班級</th>':''}<th>座號</th><th>姓名</th><th>原因</th><th>簽到次數</th><th>最近</th><th>處理</th></tr>`+
-      w.map(s=>`<tr>${showCls?`<td>${clsLabel(s.cls)}</td>`:''}<td>${s.seat}</td><td>${esc(s.name)}</td><td>${s.why.map(esc).join('；')}</td><td>${s.n}</td><td><span style="color:${COL[s.last]}">●</span> ${ZH[s.last]}</td><td>${s.fu?`<span class="st-done">✓ ${esc(s.fu.date.slice(5))} ${esc(s.fu.teacher)}</span>`:'<span class="st-up">未處理</span>'}</td></tr>`).join('')+'</table>':'<div class="st-note">這段期間沒有達到關注條件的學生。</div>')+
+      w.map(s=>`<tr>${showCls?`<td>${clsLabel(s.cls)}</td>`:''}<td>${s.seat}</td><td>${esc(mk(s.name))}</td><td>${s.why.map(esc).join('；')}</td><td>${s.n}</td><td><span style="color:${COL[s.last]}">●</span> ${ZH[s.last]}</td><td>${s.fu?`<span class="st-done">✓ ${esc(s.fu.date.slice(5))} ${esc(s.fu.teacher)}</span>`:'<span class="st-up">未處理</span>'}</td></tr>`).join('')+'</table>':'<div class="st-note">這段期間沒有達到關注條件的學生。</div>')+
       `<div class="st-note">條件（任一）：連續 3 次以上非綠色、簽到 5 次以上且負向占 60% 以上、紅色 3 次以上。僅供輔導參考，請搭配實際觀察。</div></div>`;
   }
   // 一週預警橫幅：最近 7 天持續情緒不佳者（條件同「持續關注」），顯示在「今日」畫面最上方
   function warnBanner(d,showCls){
     const w=(d&&d.watch)||[];if(!w.length)return '';
     const open=w.filter(s=>!s.fu).length;
-    const item=s=>`<div class="st-wi">${showCls?clsLabel(s.cls)+' ':''}${s.seat}號 <b>${esc(s.name)}</b>　${s.why.map(esc).join('；')}　<span style="color:${COL[s.last]}">●</span>　`+
+    const item=s=>`<div class="st-wi">${showCls?clsLabel(s.cls)+' ':''}${s.seat}號 <b>${esc(mk(s.name))}</b>　${s.why.map(esc).join('；')}　<span style="color:${COL[s.last]}">●</span>　`+
       (s.fu?`<span class="st-done">✓ 已關心（${esc(s.fu.date.slice(5))}${s.fu.teacher?' '+esc(s.fu.teacher):''}）</span>`
            :`<button class="st-fu" data-cls="${esc(s.cls)}" data-seat="${s.seat}" data-name="${esc(s.name)}">標記已關心</button>`)+`</div>`;
     const sorted=[...w].sort((a,b)=>(a.fu?1:0)-(b.fu?1:0));
