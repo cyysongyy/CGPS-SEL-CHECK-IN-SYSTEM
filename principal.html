@@ -245,7 +245,7 @@ function render(){
   $('classes').onclick=e=>{const c=e.target.closest('.cc');if(c){openCls=openCls===c.dataset.c?'':c.dataset.c;render()}};
   const oc=data.classes.find(c=>c.cls===openCls);
   $('detail').innerHTML=oc?`<div class="detail"><b>${clsLabel(oc.cls)}（${esc($('date').value)}）</b> <button id="clrCls" style="margin-left:10px;background:#fee2e2;color:#991b1b">🗑 清除此班當天資料</button><table><tr><th>座號</th><th>姓名</th><th>👋 Check-in</th><th>🏁 Check-out</th><th>變化</th><th>留言</th><th>處遇</th></tr>`+
-    oc.students.map(s=>`<tr><td>${SELAnimals.html(s.avatar,36)} ${s.seat}</td><td>${esc(s.name)}</td><td>${cell(s.ci)}</td><td>${cell(s.co)}</td><td>${s.change?`<span class="chg ${s.change}">${CHG_ZH[s.change]}${CHG_ICON[s.change]}</span>`:''}</td><td>${esc(s.note||'')}</td><td>${s.fu?esc(s.fu.status)+(s.fu.note?'：'+esc(s.fu.note):''):''}</td></tr>`).join('')+'</table></div>':'';
+    oc.students.map(s=>`<tr><td>${SELAnimals.html(s.avatar,36)} ${s.seat} <a href="referral.html?cls=${encodeURIComponent(oc.cls)}&seat=${s.seat}" target="_blank" title="輔導轉介摘要" style="text-decoration:none">📋</a></td><td>${esc(s.name)}</td><td>${cell(s.ci)}</td><td>${cell(s.co)}</td><td>${s.change?`<span class="chg ${s.change}">${CHG_ZH[s.change]}${CHG_ICON[s.change]}</span>`:''}</td><td>${esc(s.note||'')}</td><td>${s.fu?esc(s.fu.status)+(s.fu.note?'：'+esc(s.fu.note):''):''}</td></tr>`).join('')+'</table></div>':'';
   if($('clrCls'))$('clrCls').onclick=()=>clearDay(openCls);
   $('meta').textContent=`${$('date').value} · 更新 ${new Date().toTimeString().slice(0,5)} · 每分鐘自動更新`;
 }
