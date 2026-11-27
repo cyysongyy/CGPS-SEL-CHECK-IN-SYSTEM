@@ -70,6 +70,7 @@ textarea.roster{height:240px}
     <button id="refresh">🔄 重新整理</button>
     <button id="rosterBtn">📋 班級名單</button>
     <button id="csvBtn">⬇ 匯出CSV</button>
+    <button id="pwBtn">🔑 改密碼</button>
     <a id="pLink" class="hide" href="principal.html" style="color:#fff;font-size:14px">🏫 校長總控台</a>
   </header>
   <div class="wrap">
@@ -155,6 +156,7 @@ function start(){
   $('clsSel').onchange=$('date').onchange=load;
   $('refresh').onclick=load; $('rosterBtn').onclick=rosterEditor; $('csvBtn').onclick=exportCsv;
   $('modal').onclick=e=>{if(e.target.id==='modal')closeModal()};
+  $('pwBtn').onclick=openPw;if(DEMO)$('pwBtn').classList.add('hide');SELStats.bindWarn($('wkWarn'),markHandled);
   load(); clearInterval(timer); timer=setInterval(()=>{if(cls&&$('modal').classList.contains('hide'))load()},REFRESH_MS);
 }
 try{const sp=sessionStorage.getItem('sel_pass');if(sp){PASS=sp;get({action:'login'}).then(r=>{if(r.ok){ACCESS=r;start()}}).catch(()=>{})}}catch(e){}
@@ -163,6 +165,28 @@ try{const sp=sessionStorage.getItem('sel_pass');if(sp){PASS=sp;get({action:'logi
 let view='today', sDays=7;
 $('viewTabs').onclick=e=>{const b=e.target.closest('button');if(!b)return;view=b.dataset.v;
   document.querySelectorAll('#viewTabs button').forEach(x=>x.classList.toggle('on',x===b));load()};
+async function markHandled(x){   // 預警框「標記已關心」：寫一筆處遇紀錄，之後預警不再催、校長也不會升級
+  const who=store.get('sel_teacher_name','')||(ACCESS&&ACCESS.name)||'';
+  try{const r=await post({action:'followup',cls:x.cls,seat:x.seat,name:x.name,status:'已關心',note:'一週預警處理',teacher:who});if(!r.ok)throw 0}catch(e){alert('送出失敗，請再試一次')}
+  warnAt=0;warnCls='';await loadWarn();load();
+}
+function openPw(){
+  showModal(`<h3>🔑 更改我的密碼</h3><div class="mute">新密碼 6 個字以上、不可有空白，也不能和別人相同。改好後，這個帳號的所有班級都會一起換。</div>
+    <input id="pwNew" type="password" placeholder="新密碼" autocomplete="new-password"><input id="pwNew2" type="password" placeholder="再輸入一次新密碼" autocomplete="new-password">
+    <div id="pwErr" style="color:#b91c1c;min-height:22px"></div>
+    <div style="display:flex;gap:8px"><button class="btn" id="pwSave">儲存</button><button class="btn g" onclick="closeModal()">取消</button></div>`);
+  $('pwSave').onclick=async()=>{
+    const a=$('pwNew').value,b=$('pwNew2').value,E=$('pwErr');E.textContent='';
+    if(a!==b){E.textContent='兩次輸入不一樣';return}
+    $('pwSave').disabled=true;
+    try{
+      const r=await post({action:'changePassword',newPass:a});
+      if(!r.ok){E.textContent=r.error==='weak'?'密碼太短（至少 6 個字）或含有空白':r.error==='in use'?'這個密碼已被使用，請換一個':'更改失敗，請再試一次';$('pwSave').disabled=false;return}
+      PASS=a;try{sessionStorage.setItem('sel_pass',a)}catch(e){}
+      $('modalBody').innerHTML='<h3>✓ 密碼已更改</h3><div class="mute">下次登入請用新密碼。</div><div style="margin-top:10px"><button class="btn" onclick="closeModal()">好</button></div>';
+    }catch(e){E.textContent='連線失敗，請再試一次';$('pwSave').disabled=false}
+  };
+}
 let warnAt=0,warnCls='';
 async function loadWarn(){   // 一週預警橫幅（本班；最多每 5 分鐘重新計算一次）
   if(DEMO||!cls||(warnCls===cls&&Date.now()-warnAt<300000))return;warnAt=Date.now();warnCls=cls;

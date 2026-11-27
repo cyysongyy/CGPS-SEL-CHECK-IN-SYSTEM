@@ -66,9 +66,10 @@ th,td{text-align:left;padding:7px 6px;border-bottom:1px solid var(--line);vertic
     <a href="teacher.html">班級看板</a>
   </header>
   <div class="wrap">
-    <div class="st-tabs" id="viewTabs"><button data-v="today" class="on">📅 今日總覽</button><button data-v="stats">📈 趨勢統計（短／中／長期）</button><button data-v="report">📄 全校報告（每天／週／月）</button></div>
+    <div class="st-tabs" id="viewTabs"><button data-v="today" class="on">📅 今日總覽</button><button data-v="stats">📈 趨勢統計（短／中／長期）</button><button data-v="report">📄 全校報告（每天／週／月）</button><button data-v="accounts">👩‍🏫 教師帳號</button></div>
     <div id="statsView" class="hide"></div>
     <div id="reportView" class="hide"></div>
+    <div id="accountsView" class="hide"></div>
     <div id="todayView">
     <div class="stats" id="stats"></div>
     <div id="wkWarn"></div>
@@ -124,6 +125,7 @@ async function login(){
 }
 function start(){
   $('loginView').classList.add('hide');$('app').classList.remove('hide');if(DEMO)$('demo').classList.remove('hide');
+  SELStats.bindWarn($('wkWarn'),markHandled);
   $('date').value=todayStr();$('date').onchange=load;$('refresh').onclick=load;$('csvBtn').onclick=exportCsv;$('clrAll').onclick=()=>clearDay('');
   load();clearInterval(timer);timer=setInterval(load,REFRESH_MS);
 }
@@ -132,7 +134,7 @@ try{const sp=sessionStorage.getItem('sel_ppass')||localStorage.getItem('sel_ppas
 /* 外部連結（例如 Ybot 首頁）可直接開到指定畫面：
    principal.html?view=report&mode=week｜?view=report&mode=day｜?view=report&mode=month｜?view=stats&days=180｜?view=today */
 const QP=new URLSearchParams(location.search);
-let view=['today','stats','report'].includes(QP.get('view'))?QP.get('view'):'today', sDays=[7,30,180,365].includes(+QP.get('days'))?+QP.get('days'):7, sCls='';
+let view=['today','stats','report','accounts'].includes(QP.get('view'))?QP.get('view'):'today', sDays=[7,30,180,365].includes(+QP.get('days'))?+QP.get('days'):7, sCls='';
 document.querySelectorAll('#viewTabs button').forEach(x=>x.classList.toggle('on',x.dataset.v===view));
 $('viewTabs').onclick=e=>{const b=e.target.closest('button');if(!b)return;view=b.dataset.v;
   document.querySelectorAll('#viewTabs button').forEach(x=>x.classList.toggle('on',x===b));load()};
@@ -151,10 +153,11 @@ async function loadStats(){
 $('statsView').onclick=e=>{const b=e.target.closest('.st-tabs button');if(b){sDays=+b.dataset.days;loadStats()}};
 $('statsView').onchange=e=>{if(e.target.id==='sCls'){sCls=e.target.value;loadStats()}};
 async function load(){
-  $('todayView').classList.toggle('hide',view!=='today');$('statsView').classList.toggle('hide',view!=='stats');$('reportView').classList.toggle('hide',view!=='report');
+  $('todayView').classList.toggle('hide',view!=='today');$('statsView').classList.toggle('hide',view!=='stats');$('reportView').classList.toggle('hide',view!=='report');$('accountsView').classList.toggle('hide',view!=='accounts');
   try{const r=await getOverview($('date').value);if(!r.ok)throw new Error(r.error);data=r}catch(e){$('meta').textContent='載入失敗：'+e.message;return}
   if(view==='stats'){loadStats();return}
   if(view==='report'){loadReport();return}
+  if(view==='accounts'){loadAccounts();return}
   loadWarn();
   render();
 }
@@ -162,10 +165,56 @@ const CHG_ZH={improved:'好轉',same:'持平',shifted:'轉換',worsened:'轉差'
 const changeKind=(a,b)=>a===b?'same':b==='green'?'improved':a==='green'?'worsened':'shifted';
 const cell=x=>x?`<span class="dot ${x.color}"></span>${x.emotion?SELFaces.html(x.emotion,22):esc(COLOR[x.color])}`:'<span class="mute">—</span>';
 const need=s=>s.color&&!s.fu&&(s.color==='red'||(s.color==='blue'&&s.note));
+async function markHandled(x){
+  try{const r=await (await fetch(GAS_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action:'followup',cls:x.cls,seat:x.seat,name:x.name,status:'已關心',note:'一週預警處理',teacher:'校長',pass:PASS})})).json();if(!r.ok)throw 0}catch(e){alert('送出失敗，請再試一次')}
+  warnAt=0;loadWarn();
+}
 let warnAt=0;
 async function loadWarn(){   // 一週預警橫幅（最多每 5 分鐘重新計算一次，避免每分鐘自動更新時重複運算）
   if(DEMO||Date.now()-warnAt<300000)return;warnAt=Date.now();
   try{const d=await (await fetch(GAS_URL+'?'+new URLSearchParams({action:'stats',days:7,pass:PASS}))).json();if(d.ok)$('wkWarn').innerHTML=SELStats.warnBanner(d,true)}catch(e){warnAt=0}
+}
+let acctEdit=null, acctData=null, newPw=null;
+const postP=async b=>(await fetch(GAS_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({...b,pass:PASS})})).json();
+async function loadAccounts(){
+  const V=$('accountsView');
+  if(DEMO){V.innerHTML='<div class="mute">展示模式不提供教師帳號管理，部署 Apps Script 後即可使用。</div>';return}
+  if(!acctData)V.innerHTML='<div class="mute">載入中…</div>';
+  try{const r=await (await fetch(GAS_URL+'?'+new URLSearchParams({action:'listTeachers',pass:PASS}))).json();if(!r.ok)throw new Error(r.error);acctData=r}catch(e){V.innerHTML='<div class="mute">載入失敗：'+esc(e.message)+'（請先更新並重新部署最新的 Code.gs）</div>';return}
+  renderAccounts();
+}
+function renderAccounts(){
+  const V=$('accountsView'),d=acctData,e=acctEdit;
+  const pwBox=newPw?`<div style="background:#ecfdf5;border:2px solid #10b981;border-radius:12px;padding:12px;margin-bottom:12px"><b>${esc(newPw.who)} 的新密碼：</b> <code style="font-size:20px;background:#fff;padding:2px 8px;border-radius:6px">${esc(newPw.pass)}</code>
+    <div class="mute" style="margin-top:6px">這個密碼只會顯示這一次，離開這頁就看不到了。請交給老師，並請老師登入後到「🔑 改密碼」換成自己的。 <button id="pwOk" style="margin-left:8px">我記下了</button></div></div>`:'';
+  const form=e?`<div class="detail" style="margin-bottom:12px"><b>${e.acct?'編輯教師':'新增教師'}</b>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin:8px 0"><input id="aName" placeholder="教師姓名" value="${esc(e.name)}" style="padding:8px;border:2px solid #cbd5e1;border-radius:10px;font-size:15px"><input id="aMail" placeholder="信箱（收預警信，可留空）" value="${esc(e.email)}" style="padding:8px;border:2px solid #cbd5e1;border-radius:10px;font-size:15px;min-width:230px"></div>
+    <div class="mute">負責的班級：</div><div style="display:flex;gap:10px;flex-wrap:wrap;margin:6px 0">${d.classes.map(c=>`<label><input type="checkbox" class="aCls" value="${esc(c)}" ${e.classes.includes(c)?'checked':''}> ${clsLabel(c)}</label>`).join('')}</div>
+    <div id="aErr" style="color:#b91c1c;min-height:20px"></div>
+    <button id="aSave">${e.acct?'儲存':'建立帳號（會產生隨機密碼）'}</button> <button id="aCancel">取消</button>
+    ${e.acct?'<div class="mute" style="margin-top:6px">把所有班級取消勾選再儲存，就是刪除這個帳號。</div>':''}</div>`:'';
+  V.innerHTML=pwBox+form+`<div style="margin-bottom:8px"><b>教師帳號（${d.teachers.length}）</b> <button id="aNew">＋ 新增教師</button></div>
+    <table><tr><th>教師</th><th>班級</th><th>信箱</th><th></th></tr>`+d.teachers.map(t=>`<tr><td>${esc(t.name||'（未填姓名）')}</td><td>${t.classes.map(clsLabel).join('、')}</td><td>${esc(t.email)||'<span class="mute">未填（收不到預警信）</span>'}</td>
+    <td><button data-a="edit" data-k="${t.acct}">編輯</button> <button data-a="reset" data-k="${t.acct}">重設密碼</button></td></tr>`).join('')+`</table>
+    <div class="mute" style="margin-top:8px">密碼只存在試算表，這裡永遠看不到現有密碼；老師可以自己在看板按「🔑 改密碼」更改。</div>`;
+  $('aNew').onclick=()=>{acctEdit={acct:'',name:'',email:'',classes:[]};newPw=null;renderAccounts()};
+  if($('pwOk'))$('pwOk').onclick=()=>{newPw=null;renderAccounts()};
+  if($('aCancel'))$('aCancel').onclick=()=>{acctEdit=null;renderAccounts()};
+  if($('aSave'))$('aSave').onclick=async()=>{
+    const classes=[...document.querySelectorAll('.aCls:checked')].map(x=>x.value),name=$('aName').value.trim(),email=$('aMail').value.trim();
+    if(!name){$('aErr').textContent='請填教師姓名';return}
+    if(!classes.length&&!e.acct){$('aErr').textContent='請至少勾選一個班級';return}
+    if(!classes.length&&!confirm('沒有勾選任何班級，儲存＝刪除「'+e.name+'」這個帳號，確定嗎？'))return;
+    $('aSave').disabled=true;
+    try{const r=await postP({action:'saveTeacher',acct:e.acct,name,email,classes});if(!r.ok)throw new Error(r.error);
+      newPw=r.password?{who:name,pass:r.password}:null;acctEdit=null;acctData=null;loadAccounts();
+    }catch(x){$('aErr').textContent=x.message==='bad email'?'信箱格式不正確':x.message==='bad class'?'有不存在的班級':'儲存失敗：'+x.message;$('aSave').disabled=false}
+  };
+  V.onclick=async ev=>{const b=ev.target.closest('button[data-a]');if(!b)return;const t=d.teachers.find(x=>x.acct===b.dataset.k);if(!t)return;
+    if(b.dataset.a==='edit'){acctEdit={acct:t.acct,name:t.name,email:t.email,classes:[...t.classes]};newPw=null;renderAccounts();return}
+    if(!confirm('重設「'+(t.name||'這位老師')+'」的密碼？舊密碼會立刻失效。'))return;
+    try{const r=await postP({action:'resetPassword',acct:t.acct});if(!r.ok)throw new Error(r.error);newPw={who:t.name||'這位老師',pass:r.password};acctData=null;loadAccounts()}catch(x){alert('重設失敗：'+x.message)}
+  };
 }
 let rMode=['day','week','month'].includes(QP.get('mode'))?QP.get('mode'):'week';
 async function loadReport(){
