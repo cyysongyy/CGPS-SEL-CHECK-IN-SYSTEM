@@ -11,13 +11,15 @@
  *   Teachers  : 班級, 教師, 密碼, 信箱   ← 老師登入用；同一位老師帶多班就多列、用同一組密碼。
  *               「信箱」填學校 Google 信箱，學生選紅色時會立刻寄信通知（可留空＝不通知）
  *   Followups : 時間, 日期, 班級, 座號, 姓名, 狀態, 處遇紀錄, 教師
+ *   Calendar  : 日期（例：2026-12-25）, 類型（放假／補課）, 說明 ← 不上課的日子填「放假」；週六日補課填「補課」。週一至週五預設上課。
  */
 var COLORS = ['red', 'blue', 'yellow', 'green'];
 var SHEETS = {
   Checkins: ['id', '時間', '日期', '班級', '座號', '姓名', '顏色', '情緒', '備註', '類型'],
   Roster: ['班級', '座號', '姓名', '圖案'],
   Teachers: ['班級', '教師', '密碼', '信箱'],
-  Followups: ['時間', '日期', '班級', '座號', '姓名', '狀態', '處遇紀錄', '教師']
+  Followups: ['時間', '日期', '班級', '座號', '姓名', '狀態', '處遇紀錄', '教師'],
+  Calendar: ['日期', '類型', '說明']
 };
 
 function sheet_(name) {
@@ -127,6 +129,10 @@ function doGet(e) {
       if (p.cls ? !can_(acc, p.cls) : acc.role !== 'principal') return out_({ ok: false, error: 'forbidden' });
       return out_(stats_(p.cls || '', Math.min(Math.max(Number(p.days) || 7, 1), 400)));
     }
+    if (a === 'listTeachers') {
+      if (acc.role !== 'principal') return out_({ ok: false, error: 'forbidden' });
+      return out_({ ok: true, teachers: listTeachers_(), classes: allClasses_() });
+    }
     if (!can_(acc, p.cls)) return out_({ ok: false, error: 'forbidden' });
     if (a === 'today') {
       var d = p.date || today_();
@@ -162,6 +168,80 @@ function doGet(e) {
   } catch (err) {
     return out_({ ok: false, error: String(err) });
   }
+}
+
+// ===== 教師帳號（Teachers 分頁）=====
+// 每位老師一組自己的密碼；同一位老師帶多班＝多列、同一組密碼。密碼只存在試算表，不會回傳給任何前端。
+function acctKey_(pass) {   // 帳號代號：密碼的雜湊前 12 碼，前端用來指定帳號，看不出密碼
+  var d = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, 'sel|' + pass);
+  return d.map(function (b) { return ('0' + (b & 255).toString(16)).slice(-2); }).join('').slice(0, 12);
+}
+function newPassword_() { return 'k' + Utilities.getUuid().replace(/-/g, '').slice(0, 7); }   // k 開頭，避免被試算表當成數字
+function passInUse_(p, exceptKey) {
+  if (isPrincipal_(p)) return true;
+  return rows_('Teachers').some(function (r) { var q = String(r['密碼']); return q === p && acctKey_(q) !== exceptKey; });
+}
+function teacherCols_(sh) {
+  var head = sh.getDataRange().getValues()[0], c = { cls: head.indexOf('班級'), name: head.indexOf('教師'), pass: head.indexOf('密碼'), mail: head.indexOf('信箱') };
+  if (c.mail < 0) { c.mail = head.length; sh.getRange(1, c.mail + 1).setValue('信箱'); head.push('信箱'); }
+  c.width = head.length; return c;
+}
+function listTeachers_() {
+  var map = {}, order = [];
+  rows_('Teachers').forEach(function (r) {
+    var pw = String(r['密碼'] || ''); if (!pw) return;
+    var k = acctKey_(pw), a = map[k];
+    if (!a) { a = map[k] = { acct: k, name: '', classes: [], email: '' }; order.push(k); }
+    if (!a.name && r['教師']) a.name = String(r['教師']);
+    if (!a.email && mailValid_(r['信箱'])) a.email = mailValid_(r['信箱']);
+    if (r['班級']) a.classes.push(String(r['班級']));
+  });
+  return order.map(function (k) { map[k].classes.sort(); return map[k]; }).sort(function (a, b) { return a.classes[0] < b.classes[0] ? -1 : 1; });
+}
+function setAcctPassword_(sh, c, key, newPass) {
+  var v = sh.getDataRange().getValues(), n = 0;
+  for (var i = 1; i < v.length; i++) if (acctKey_(String(v[i][c.pass])) === key) { sh.getRange(i + 1, c.pass + 1).setNumberFormat('@').setValue(newPass); n++; }
+  return n;
+}
+function saveTeacher_(b) {
+  var name = str_(b.name, 20).trim(), email = str_(b.email, 80).trim(), classes = (b.classes || []).map(function (x) { return str_(x, 10); }), valid = allClasses_();
+  if (!name) return { ok: false, error: 'name required' };
+  if (email && !mailValid_(email)) return { ok: false, error: 'bad email' };
+  for (var i = 0; i < classes.length; i++) if (valid.indexOf(classes[i]) < 0) return { ok: false, error: 'bad class' };
+  var sh = sheet_('Teachers'), c = teacherCols_(sh), v = sh.getDataRange().getValues(), pass = '', key = String(b.acct || '');
+  if (key) {
+    for (var r = v.length - 1; r >= 1; r--) if (acctKey_(String(v[r][c.pass])) === key) { pass = String(v[r][c.pass]); sh.deleteRow(r + 1); }
+    if (!pass) return { ok: false, error: 'not found' };
+  } else { pass = newPassword_(); }
+  classes.forEach(function (cl) {
+    var row = []; for (var j = 0; j < c.width; j++) row.push('');
+    row[c.cls] = cl; row[c.name] = name; row[c.pass] = pass; row[c.mail] = email;
+    sh.appendRow(row);
+    var last = sh.getLastRow(); sh.getRange(last, c.cls + 1).setNumberFormat('@').setValue(cl); sh.getRange(last, c.pass + 1).setNumberFormat('@').setValue(pass);
+  });
+  return key ? { ok: true } : { ok: true, password: pass };
+}
+
+// ===== 上課日（Calendar 分頁）=====
+// 週一至週五預設上課；Calendar 分頁填「放假」的日子不上課；週六日填「補課」的日子要上課。
+// 參與率以「上課日數」為分母，所以整天沒簽到的日子會拉低參與率（不再被略過）。
+function calendarMap_() {
+  var m = {};
+  try { rows_('Calendar').forEach(function (r) { var d = dateStr_(r['日期']); if (d) m[d.slice(0, 10)] = String(r['類型'] || '').trim(); }); } catch (e) {}
+  return m;
+}
+function isSchoolDay_(ymd, cal) {
+  cal = cal || calendarMap_();
+  var t = cal[ymd];
+  if (t === '放假') return false;
+  if (t === '補課') return true;
+  var wd = new Date(ymd + 'T00:00:00Z').getUTCDay();
+  return wd >= 1 && wd <= 5;
+}
+function schoolDaysBetween_(start, end) {
+  var cal = calendarMap_(), n = 0;
+  for (var d = start; d <= end; d = addDays_(d, 1)) if (isSchoolDay_(d, cal)) n++;
+  return n;
 }
 
 // ===== 情緒統計（短期 7 天／中期 30 天／長期 180 天，由前端選 days）=====
@@ -202,6 +282,7 @@ function stats_(cls, days) {
   var cur = all.filter(function (x) { return x.date >= start; });
   var prev = all.filter(function (x) { return x.date < start; });
   var bucketOf = function (d) { return weekly ? weekStart_(d) : d; };
+  var schoolDays = schoolDaysBetween_(start, end);   // 這段期間的上課日數（含今天）
 
   // 簽到人次的時間序列：31 天內以日、較長以週為單位
   var buckets = {};
@@ -242,8 +323,7 @@ function stats_(cls, days) {
   if (!cls) {
     Object.keys(sizes).sort().forEach(function (c) {
       var mine = cur.filter(function (x) { return x.cls === c; }), pv = prev.filter(function (x) { return x.cls === c; });
-      var daysActive = {}; mine.forEach(function (x) { daysActive[x.date] = 1; });
-      var nd = Object.keys(daysActive).length, t = tally_(mine), size = sizes[c];
+      var t = tally_(mine), size = sizes[c], nd = schoolDays || 1;
       var ciN = mine.filter(function (x) { return x.kind === 'ci'; }).length, coN = mine.length - ciN;
       byClass.push({ cls: c, size: size, n: t.n, red: t.red, blue: t.blue, yellow: t.yellow, green: t.green, neg: t.neg,
         prevNeg: pv.length ? tally_(pv).neg : null,
@@ -252,6 +332,14 @@ function stats_(cls, days) {
     });
   }
 
+  // 預警處理狀態：這段期間內，老師／校長在 Followups 登錄過的最新一筆（有＝已關心）
+  var fuLatest = {};
+  rows_('Followups').forEach(function (r) {
+    var d = dateStr_(r['日期']).slice(0, 10);
+    if (d < start || d > end || (cls && String(r['班級']) !== cls)) return;
+    var k = String(r['班級']) + '|' + Number(r['座號']), t = String(r['時間'] || d);
+    if (!fuLatest[k] || t >= fuLatest[k].time) fuLatest[k] = { time: t, date: d, status: String(r['狀態'] || ''), note: String(r['處遇紀錄'] || ''), teacher: String(r['教師'] || '') };
+  });
   // 持續關注學生（含姓名；前端依權限顯示）
   var per = {};
   cur.forEach(function (x) { var k = x.cls + '|' + x.seat; (per[k] = per[k] || []).push(x); });
@@ -268,12 +356,13 @@ function stats_(cls, days) {
     if (why.length) {
       var pt = prev.filter(function (x) { return x.cls === list[0].cls && x.seat === list[0].seat; });
       watch.push({ cls: list[0].cls, seat: list[0].seat, name: names[k] || '', n: t.n, red: t.red, blue: t.blue, yellow: t.yellow,
-        green: t.green, neg: t.neg, prevNeg: pt.length ? tally_(pt).neg : null, streak: streak, last: list[list.length - 1].color, why: why });
+        green: t.green, neg: t.neg, prevNeg: pt.length ? tally_(pt).neg : null, streak: streak, last: list[list.length - 1].color, why: why,
+        fu: fuLatest[k] || null });
     }
   });
   watch.sort(function (a, b) { return (b.streak - a.streak) || (b.neg - a.neg); });
 
-  return { ok: true, scope: cls || 'school', days: days, bucket: weekly ? 'week' : 'day', start: start, end: end,
+  return { ok: true, scope: cls || 'school', days: days, bucket: weekly ? 'week' : 'day', start: start, end: end, schoolDays: schoolDays,
     totals: tally_(cur), prevTotals: tally_(prev),
     kinds: { ci: tally_(cur.filter(function (x) { return x.kind === 'ci'; })), co: tally_(cur.filter(function (x) { return x.kind === 'co'; })) },
     change: change, changeSeries: changeSeries, series: series, emotions: emotions, byClass: byClass, watch: watch };
@@ -363,42 +452,62 @@ function testAlert() {
 // 同一位學生 3 天內只通知一次，避免天天重複寄信。使用方式：在編輯器選 setupWeeklyWarning 執行一次（會要求授權）。
 var WARN_GAP_DAYS_ = 3;
 function weeklyWarning() { return weeklyWarning_(false); }
+function jsonProp_(k) { try { return JSON.parse(prop_(k) || '{}') || {}; } catch (e) { return {}; } }
+function mailValid_(m) { m = String(m || '').trim(); return /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(m) ? m : ''; }
 function weeklyWarning_(force) {
-  var dow = Number(Utilities.formatDate(new Date(), 'Asia/Taipei', 'u'));   // 1=週一 … 7=週日
-  if (!force && dow > 5) return { skipped: 'weekend' };
+  var today = today_();
+  if (!force && !isSchoolDay_(today)) return { skipped: 'noschool' };   // 週末、放假日（Calendar 分頁）不寄
   var st = stats_('', 7), watch = st.watch || [];
-  if (!watch.length) return { sent: 0, watch: 0 };
-  var props = PropertiesService.getScriptProperties(), sent = {};
-  try { sent = JSON.parse(prop_('WARN_SENT') || '{}'); } catch (e1) { sent = {}; }
-  var today = today_(), fresh = watch.filter(function (w) {
+  var props = PropertiesService.getScriptProperties();
+  var sent = jsonProp_('WARN_SENT'), first = jsonProp_('WARN_FIRST'), esc = jsonProp_('WARN_ESC'), inWatch = {};
+  watch.forEach(function (w) { inWatch[w.cls + '|' + w.seat] = 1; });
+  watch.forEach(function (w) { if (w.fu) { delete first[w.cls + '|' + w.seat]; delete esc[w.cls + '|' + w.seat]; } });   // 已有人關心：重新計算
+  // 不再符合條件的學生，清掉紀錄（之後再符合就重新計算）
+  [sent, first, esc].forEach(function (o) { Object.keys(o).forEach(function (k) { if (!inWatch[k]) delete o[k]; }); });
+  var unhandled = watch.filter(function (w) { return !w.fu; });
+  var fresh = unhandled.filter(function (w) {   // 已有人登錄關心的不再重複通知
     var last = sent[w.cls + '|' + w.seat];
     return !last || last < addDays_(today, -(WARN_GAP_DAYS_ - 1));
   });
-  if (!fresh.length) return { sent: 0, watch: watch.length };
-  var byMail = {}, valid = function (m) { m = String(m || '').trim(); return /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(m) ? m : ''; };
+  var byMail = {};
   rows_('Teachers').forEach(function (r) {
-    var m = valid(r['信箱']); if (!m) return;
+    var m = mailValid_(r['信箱']); if (!m) return;
     var c = String(r['班級']), mine = fresh.filter(function (w) { return w.cls === c; });
     if (mine.length) byMail[m] = (byMail[m] || []).concat(mine);
   });
-  var pm = valid(prop_('PRINCIPAL_EMAIL')); if (pm) byMail[pm] = fresh;
+  var pm = mailValid_(prop_('PRINCIPAL_EMAIL'));
+  if (pm && fresh.length) byMail[pm] = fresh;
   var dash = prop_('DASHBOARD_URL') || '', n = 0;
+  var line = function (w) { return clsLabel_(w.cls) + ' ' + w.seat + '號 ' + w.name + '：' + w.why.join('；') + '（簽到 ' + w.n + ' 次，負向 ' + Math.round(w.neg * 100) + '%）'; };
   Object.keys(byMail).forEach(function (m) {
     if (MailApp.getRemainingDailyQuota() < 1) return;
-    var list = byMail[m], seen = {}; list = list.filter(function (w) { var k = w.cls + '|' + w.seat; if (seen[k]) return false; seen[k] = 1; return true; });
+    var seen = {}, list = byMail[m].filter(function (w) { var k = w.cls + '|' + w.seat; if (seen[k]) return false; seen[k] = 1; return true; });
     MailApp.sendEmail({
       to: m, name: 'SEL 情緒簽到', subject: '【SEL 一週預警】' + list.length + ' 位學生近一週情緒持續不佳（' + today + '）',
-      body: '統計期間：' + st.start + ' ～ ' + st.end + '\n\n' + list.map(function (w) {
-        return clsLabel_(w.cls) + ' ' + w.seat + '號 ' + w.name + '：' + w.why.join('；') + '（簽到 ' + w.n + ' 次，負向 ' + Math.round(w.neg * 100) + '%）';
-      }).join('\n') + '\n\n建議：找機會個別關心，了解近期發生的事，必要時轉介輔導室。' + (dash ? '\n看板：' + dash : '') +
-      '\n\n※ 本信含學生個資，請勿轉寄。同一位學生 ' + WARN_GAP_DAYS_ + ' 天內只通知一次。'
+      body: '統計期間：' + st.start + ' ～ ' + st.end + '\n\n' + list.map(line).join('\n') +
+        '\n\n建議：找機會個別關心，了解近期發生的事，必要時轉介輔導室。關心後請到看板按「標記已關心」，系統就不會再催。' + (dash ? '\n看板：' + dash : '') +
+        '\n\n※ 本信含學生個資，請勿轉寄。同一位學生 ' + WARN_GAP_DAYS_ + ' 天內只通知一次。'
     });
     n++;
   });
-  fresh.forEach(function (w) { sent[w.cls + '|' + w.seat] = today; });
-  Object.keys(sent).forEach(function (k) { if (sent[k] < addDays_(today, -30)) delete sent[k]; });
+  fresh.forEach(function (w) { var k = w.cls + '|' + w.seat; sent[k] = today; if (!first[k]) first[k] = today; });
+  // 升級：通報滿 3 天仍沒有人登錄關心 → 通知校長（同一位學生每 3 天最多升級一次）
+  var escalate = unhandled.filter(function (w) {
+    var k = w.cls + '|' + w.seat;
+    return first[k] && first[k] <= addDays_(today, -WARN_GAP_DAYS_) && (!esc[k] || esc[k] <= addDays_(today, -WARN_GAP_DAYS_));
+  }), en = 0;
+  if (pm && escalate.length && MailApp.getRemainingDailyQuota() >= 1) {
+    MailApp.sendEmail({
+      to: pm, name: 'SEL 情緒簽到', subject: '【SEL 預警升級】' + escalate.length + ' 位學生通報 ' + WARN_GAP_DAYS_ + ' 天以上仍未處理（' + today + '）',
+      body: escalate.map(function (w) { return line(w) + '｜首次通報 ' + first[w.cls + '|' + w.seat]; }).join('\n') +
+        '\n\n以上學生已通報導師超過 ' + WARN_GAP_DAYS_ + ' 天，看板上仍沒有「已關心」紀錄，請了解狀況。' + (dash ? '\n看板：' + dash : '') + '\n\n※ 本信含學生個資，請勿轉寄。'
+    });
+    escalate.forEach(function (w) { esc[w.cls + '|' + w.seat] = today; }); en = escalate.length;
+  }
   props.setProperty('WARN_SENT', JSON.stringify(sent));
-  return { sent: n, watch: watch.length, notified: fresh.length };
+  props.setProperty('WARN_FIRST', JSON.stringify(first));
+  props.setProperty('WARN_ESC', JSON.stringify(esc));
+  return { sent: n, watch: watch.length, unhandled: unhandled.length, notified: fresh.length, escalated: en };
 }
 // 只需執行一次：建立「每天下午 4 點多」的定時觸發器（會先移除舊的同名觸發器，不會重複）
 function setupWeeklyWarning() {
@@ -496,6 +605,22 @@ function doPost(e) {
         bsh.getRange(bsh.getLastRow() + 1, 1, dbk.length, w).setValues(dbk.map(function (r) { while (r.length < w) r.push(''); return r; }));
       }
       return out_({ ok: true, deleted: dn, followups: dfn });
+    }
+    if (a === 'changePassword') {   // 老師自己改密碼（校長密碼在指令碼屬性，不能從這裡改）
+      if (acc.role !== 'teacher') return out_({ ok: false, error: 'forbidden' });
+      var np = String(b.newPass == null ? '' : b.newPass);
+      if (np.length < 6 || np.length > 30 || /\s/.test(np)) return out_({ ok: false, error: 'weak' });
+      var myKey = acctKey_(String(b.pass));
+      if (passInUse_(np, myKey)) return out_({ ok: false, error: 'in use' });
+      var tsh = sheet_('Teachers'), tc = teacherCols_(tsh);
+      setAcctPassword_(tsh, tc, myKey, np);
+      return out_({ ok: true });
+    }
+    if (a === 'saveTeacher' || a === 'resetPassword') {   // 僅校長：新增／修改教師帳號、重設密碼（新密碼只回傳這一次）
+      if (acc.role !== 'principal') return out_({ ok: false, error: 'forbidden' });
+      if (a === 'saveTeacher') return out_(saveTeacher_(b));
+      var rsh = sheet_('Teachers'), rc = teacherCols_(rsh), rp = newPassword_();
+      return out_(setAcctPassword_(rsh, rc, String(b.acct || ''), rp) ? { ok: true, password: rp } : { ok: false, error: 'not found' });
     }
     if (!can_(acc, b.cls)) return out_({ ok: false, error: 'forbidden' });
     if (a === 'clearAvatar') {   // 老師（自己班）或校長：重設某位學生的圖案，讓他可以重新選一次

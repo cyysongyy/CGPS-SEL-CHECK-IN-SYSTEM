@@ -26,7 +26,7 @@
 .st-t{width:100%;border-collapse:collapse;font-size:14px}.st-t th,.st-t td{text-align:left;padding:6px 5px;border-bottom:1px solid #e5e7eb}
 .st-dns{display:flex;gap:10px;flex-wrap:wrap;justify-content:space-around}.st-dn{flex:1;min-width:190px;text-align:center}.st-dnh{font-weight:700;margin-bottom:8px;font-size:15px}
 .st-ring{width:150px;height:150px;border-radius:50%;margin:0 auto 8px;display:flex;align-items:center;justify-content:center}.st-ring>div{width:86px;height:86px;border-radius:50%;background:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center}.st-ring b{font-size:22px;line-height:1}.st-ring span{font-size:12px;color:#6b7280}
-.st-warn{background:#fff7ed;border:2px solid #fb923c;border-radius:12px;padding:10px 14px;margin:8px 0;line-height:1.7}.st-warn>b{color:#c2410c}
+.st-warn{background:#fff7ed;border:2px solid #fb923c;border-radius:12px;padding:10px 14px;margin:8px 0;line-height:1.7}.st-warn>b{color:#c2410c}.st-fu{border:0;background:#ea580c;color:#fff;border-radius:999px;padding:3px 12px;font-size:13px;cursor:pointer;font-family:inherit}.st-done{color:#047857;font-size:13px}
 .st-note{color:#6b7280;font-size:13px;margin-top:6px}`;
   if(!document.getElementById('st-css')){const s=document.createElement('style');s.id='st-css';s.textContent=css;document.head.appendChild(s)}
 
@@ -58,7 +58,7 @@
     if(!d.byClass||!d.byClass.length)return '';
     return `<div class="st-card"><h3>各班比較</h3><div style="overflow-x:auto"><table class="st-t"><tr><th>班級</th><th>👋 Check-in 簽到率</th><th>🏁 Check-out 簽到率</th><th>🔴</th><th>🔵</th><th>🟡</th><th>🟢</th><th>負向占比</th><th>好轉↑</th><th>轉差↓</th></tr>`+
       d.byClass.map(c=>{const ch=c.change||{};return `<tr><td>${clsLabel(c.cls)}</td><td>${pct(c.ciRate)}</td><td>${pct(c.coRate)}</td><td>${c.red}</td><td>${c.blue}</td><td>${c.yellow}</td><td>${c.green}</td><td>${pct(c.neg)} ${c.prevNeg==null?'':(c.neg>c.prevNeg?'<span class="st-up">▲</span>':c.neg<c.prevNeg?'<span class="st-down">▼</span>':'＝')}</td><td>${ch.improved||0}</td><td>${ch.worsened?`<b class="st-up">${ch.worsened}</b>`:0}</td></tr>`}).join('')+
-      `</table></div><div class="st-note">簽到率＝該類型（Check-in／Check-out）簽到人次 ÷（有簽到的天數 × 班級人數）；好轉／轉差＝同一天 Check-in 與 Check-out 都有簽到者的人次；▲▼ 與前一個同長度期間比較。</div></div>`;
+      `</table></div><div class="st-note">簽到率＝該類型（Check-in／Check-out）簽到人次 ÷（上課日數 × 班級人數）；上課日＝週一至週五，扣除試算表 Calendar 分頁標示的放假日；好轉／轉差＝同一天 Check-in 與 Check-out 都有簽到者的人次；▲▼ 與前一個同長度期間比較。</div></div>`;
   }
   // 當天心情變化：Check-in → Check-out
   const KIND={improved:{zh:'好轉',c:'#2fa86b',icon:'↑',hint:'非綠 → 綠'},same:{zh:'持平',c:'#94a3b8',icon:'＝',hint:'顏色不變'},shifted:{zh:'轉換',c:'#f59e0b',icon:'⇄',hint:'非綠 → 另一種非綠'},worsened:{zh:'轉差',c:'#e5484d',icon:'↓',hint:'綠 → 非綠'}};
@@ -117,17 +117,26 @@
   }
   function watch(d,showCls){
     const w=d.watch||[];
-    return `<div class="st-card"><h3>🔎 持續關注學生（${w.length} 位）</h3>`+(w.length?`<table class="st-t"><tr>${showCls?'<th>班級</th>':''}<th>座號</th><th>姓名</th><th>原因</th><th>簽到次數</th><th>最近</th></tr>`+
-      w.map(s=>`<tr>${showCls?`<td>${clsLabel(s.cls)}</td>`:''}<td>${s.seat}</td><td>${esc(s.name)}</td><td>${s.why.map(esc).join('；')}</td><td>${s.n}</td><td><span style="color:${COL[s.last]}">●</span> ${ZH[s.last]}</td></tr>`).join('')+'</table>':'<div class="st-note">這段期間沒有達到關注條件的學生。</div>')+
+    return `<div class="st-card"><h3>🔎 持續關注學生（${w.length} 位）</h3>`+(w.length?`<table class="st-t"><tr>${showCls?'<th>班級</th>':''}<th>座號</th><th>姓名</th><th>原因</th><th>簽到次數</th><th>最近</th><th>處理</th></tr>`+
+      w.map(s=>`<tr>${showCls?`<td>${clsLabel(s.cls)}</td>`:''}<td>${s.seat}</td><td>${esc(s.name)}</td><td>${s.why.map(esc).join('；')}</td><td>${s.n}</td><td><span style="color:${COL[s.last]}">●</span> ${ZH[s.last]}</td><td>${s.fu?`<span class="st-done">✓ ${esc(s.fu.date.slice(5))} ${esc(s.fu.teacher)}</span>`:'<span class="st-up">未處理</span>'}</td></tr>`).join('')+'</table>':'<div class="st-note">這段期間沒有達到關注條件的學生。</div>')+
       `<div class="st-note">條件（任一）：連續 3 次以上非綠色、簽到 5 次以上且負向占 60% 以上、紅色 3 次以上。僅供輔導參考，請搭配實際觀察。</div></div>`;
   }
   // 一週預警橫幅：最近 7 天持續情緒不佳者（條件同「持續關注」），顯示在「今日」畫面最上方
   function warnBanner(d,showCls){
     const w=(d&&d.watch)||[];if(!w.length)return '';
-    return `<div class="st-warn"><b>⚠ 一週預警：${w.length} 位學生近 7 天情緒持續不佳</b>`+w.slice(0,8).map(s=>`<div>${showCls?clsLabel(s.cls)+' ':''}${s.seat}號 <b>${esc(s.name)}</b>　${s.why.map(esc).join('；')}　<span style="color:${COL[s.last]}">●</span></div>`).join('')+(w.length>8?`<div>…還有 ${w.length-8} 位，請看「趨勢統計」</div>`:'')+`</div>`;
+    const open=w.filter(s=>!s.fu).length;
+    const item=s=>`<div class="st-wi">${showCls?clsLabel(s.cls)+' ':''}${s.seat}號 <b>${esc(s.name)}</b>　${s.why.map(esc).join('；')}　<span style="color:${COL[s.last]}">●</span>　`+
+      (s.fu?`<span class="st-done">✓ 已關心（${esc(s.fu.date.slice(5))}${s.fu.teacher?' '+esc(s.fu.teacher):''}）</span>`
+           :`<button class="st-fu" data-cls="${esc(s.cls)}" data-seat="${s.seat}" data-name="${esc(s.name)}">標記已關心</button>`)+`</div>`;
+    const sorted=[...w].sort((a,b)=>(a.fu?1:0)-(b.fu?1:0));
+    return `<div class="st-warn"><b>⚠ 一週預警：${w.length} 位學生近 7 天情緒持續不佳${open?`（${open} 位尚未處理）`:'（都已關心 ✓）'}</b>`+sorted.slice(0,8).map(item).join('')+(w.length>8?`<div>…還有 ${w.length-8} 位，請看「趨勢統計」</div>`:'')+`</div>`;
+  }
+  // 預警框上的「標記已關心」按鈕：由頁面提供 onMark({cls,seat,name})，完成後自行重新整理
+  function bindWarn(el,onMark){
+    el.onclick=e=>{const b=e.target.closest('.st-fu');if(!b)return;b.disabled=true;b.textContent='送出中…';onMark({cls:b.dataset.cls,seat:+b.dataset.seat,name:b.dataset.name})};
   }
   window.SELStats={
-    RANGES,warnBanner,
+    RANGES,warnBanner,bindWarn,
     /* 回傳統計畫面 HTML。opts.showCls：顯示班級欄（校長）；opts.tabsHtml：頁面自行傳入期間按鈕 */
     html(d,opts){
       opts=opts||{};const t=d.totals,p=d.prevTotals,hasPrev=p.n>0;
