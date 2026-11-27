@@ -168,7 +168,7 @@ $('viewTabs').onclick=e=>{const b=e.target.closest('button');if(!b)return;view=b
   document.querySelectorAll('#viewTabs button').forEach(x=>x.classList.toggle('on',x===b));load()};
 async function markHandled(x){   // 預警框「標記已關心」：寫一筆處遇紀錄，之後預警不再催、校長也不會升級
   const who=store.get('sel_teacher_name','')||(ACCESS&&ACCESS.name)||'';
-  try{const r=await post({action:'followup',cls:x.cls,seat:x.seat,name:x.name,status:'已關心',note:'一週預警處理',teacher:who});if(!r.ok)throw 0}catch(e){alert('送出失敗，請再試一次')}
+  try{const r=await post({action:'followup',cls:x.cls,seat:x.seat,name:x.name,status:x.status||'已關懷',note:'一週預警處理',teacher:who});if(!r.ok)throw 0}catch(e){alert('送出失敗，請再試一次')}
   warnAt=0;warnCls='';await loadWarn();load();
 }
 function openPw(){

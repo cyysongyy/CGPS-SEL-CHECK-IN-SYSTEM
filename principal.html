@@ -167,7 +167,7 @@ const changeKind=(a,b)=>a===b?'same':b==='green'?'improved':a==='green'?'worsene
 const cell=x=>x?`<span class="dot ${x.color}"></span>${x.emotion?SELFaces.html(x.emotion,22):esc(COLOR[x.color])}`:'<span class="mute">—</span>';
 const need=s=>s.color&&!s.fu&&(s.color==='red'||(s.color==='blue'&&s.note));
 async function markHandled(x){
-  try{const r=await (await fetch(GAS_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action:'followup',cls:x.cls,seat:x.seat,name:x.name,status:'已關心',note:'一週預警處理',teacher:'校長',pass:PASS})})).json();if(!r.ok)throw 0}catch(e){alert('送出失敗，請再試一次')}
+  try{const r=await (await fetch(GAS_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action:'followup',cls:x.cls,seat:x.seat,name:x.name,status:x.status||'已關懷',note:'一週預警處理',teacher:'校長',pass:PASS})})).json();if(!r.ok)throw 0}catch(e){alert('送出失敗，請再試一次')}
   warnAt=0;loadWarn();
 }
 let warnAt=0;

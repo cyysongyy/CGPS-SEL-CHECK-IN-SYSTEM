@@ -111,7 +111,7 @@ function doGet(e) {
       checkinRows_().forEach(function (r) {
         if (String(r['班級']) === String(p.cls) && dateStr_(r['日期']) === d0) done[r._kind].push(Number(r['座號']));
       });
-      return out_({ ok: true, roster: list, done: done });
+      return out_({ ok: true, roster: list, done: done, schoolDay: isSchoolDay_(d0) });
     }
     // 校長總控台：全校總覽（含姓名）
     if (a === 'overview') {
@@ -261,8 +261,8 @@ function tally_(list) {
   return t;
 }
 function zeroChange_() { return { both: 0, improved: 0, same: 0, shifted: 0, worsened: 0 }; }
-function stats_(cls, days) {
-  var end = today_(), start = addDays_(end, -(days - 1)), prevStart = addDays_(start, -days), weekly = days > 31;
+function stats_(cls, days, endOn) {
+  var end = endOn || today_(), start = addDays_(end, -(days - 1)), prevStart = addDays_(start, -days), weekly = days > 31;
   var names = {}, sizes = {};
   rows_('Roster').forEach(function (r) {
     var c = String(r['班級']); names[c + '|' + Number(r['座號'])] = r['姓名'];
@@ -449,7 +449,7 @@ function testAlert() {
 // ===== 一週預警（Email）=====
 // 每天（上課日）由定時觸發器執行：看最近 7 天，持續情緒不佳的學生（連續 3 次以上非綠、簽到 5 次以上且負向 60% 以上、
 // 紅色 3 次以上、當天由綠轉差 3 次以上，任一條件）會寄信給該班導師與校長（指令碼屬性 PRINCIPAL_EMAIL）。
-// 同一位學生 3 天內只通知一次，避免天天重複寄信。使用方式：在編輯器選 setupWeeklyWarning 執行一次（會要求授權）。
+// 同一位學生 3 天內只通知一次，避免天天重複寄信。使用方式：在編輯器選 setupAutomation 執行一次（會要求授權）。
 var WARN_GAP_DAYS_ = 3;
 function weeklyWarning() { return weeklyWarning_(false); }
 function jsonProp_(k) { try { return JSON.parse(prop_(k) || '{}') || {}; } catch (e) { return {}; } }
@@ -464,6 +464,7 @@ function weeklyWarning_(force) {
   watch.forEach(function (w) { if (w.fu) { delete first[w.cls + '|' + w.seat]; delete esc[w.cls + '|' + w.seat]; } });   // 已有人關心：重新計算
   // 不再符合條件的學生，清掉紀錄（之後再符合就重新計算）
   [sent, first, esc].forEach(function (o) { Object.keys(o).forEach(function (k) { if (!inWatch[k]) delete o[k]; }); });
+  var resolved = autoResolve_(watch);   // 連續 3 天簽到綠色的學生，自動結案（寫一筆「情緒已回穩」）
   var unhandled = watch.filter(function (w) { return !w.fu; });
   var fresh = unhandled.filter(function (w) {   // 已有人登錄關心的不再重複通知
     var last = sent[w.cls + '|' + w.seat];
@@ -485,7 +486,7 @@ function weeklyWarning_(force) {
     MailApp.sendEmail({
       to: m, name: 'SEL 情緒簽到', subject: '【SEL 一週預警】' + list.length + ' 位學生近一週情緒持續不佳（' + today + '）',
       body: '統計期間：' + st.start + ' ～ ' + st.end + '\n\n' + list.map(line).join('\n') +
-        '\n\n建議：找機會個別關心，了解近期發生的事，必要時轉介輔導室。關心後請到看板按「標記已關心」，系統就不會再催。' + (dash ? '\n看板：' + dash : '') +
+        '\n\n建議：找機會個別關心，了解近期發生的事，必要時轉介輔導室。關心後請到看板在該學生旁按一下處遇按鈕（已關懷／已通知家長／已轉介輔導），系統就不會再催；連續 3 天回到綠色也會自動結案。' + (dash ? '\n看板：' + dash : '') +
         '\n\n※ 本信含學生個資，請勿轉寄。同一位學生 ' + WARN_GAP_DAYS_ + ' 天內只通知一次。'
     });
     n++;
@@ -507,14 +508,95 @@ function weeklyWarning_(force) {
   props.setProperty('WARN_SENT', JSON.stringify(sent));
   props.setProperty('WARN_FIRST', JSON.stringify(first));
   props.setProperty('WARN_ESC', JSON.stringify(esc));
-  return { sent: n, watch: watch.length, unhandled: unhandled.length, notified: fresh.length, escalated: en };
+  return { sent: n, watch: watch.length, unhandled: unhandled.length, notified: fresh.length, escalated: en, resolved: resolved };
 }
-// 只需執行一次：建立「每天下午 4 點多」的定時觸發器（會先移除舊的同名觸發器，不會重複）
-function setupWeeklyWarning() {
-  ScriptApp.getProjectTriggers().forEach(function (t) { if (t.getHandlerFunction() === 'weeklyWarning') ScriptApp.deleteTrigger(t); });
+// 自動結案：未處理的預警學生，最近 3 個有簽到的日子最後一次都是綠色（且最近一次在 3 天內）→ 寫入 Followups「情緒已回穩」（教師＝系統）
+function autoResolve_(watch) {
+  var cand = watch.filter(function (w) { return !w.fu; });
+  if (!cand.length) return 0;
+  var today = today_(), from = addDays_(today, -10), per = {};
+  checkinRows_().forEach(function (r) {
+    var d = dateStr_(r['日期']).slice(0, 10); if (d < from) return;
+    var k = String(r['班級']) + '|' + Number(r['座號']), t = timeStr_(r['時間']);
+    var day = (per[k] = per[k] || {}), cur = (day[d] = day[d] || {}), slot = cur[r._kind];
+    if (!slot || t >= slot.t) cur[r._kind] = { t: t, c: r['顏色'] };
+  });
+  var n = 0, fsh = sheet_('Followups');
+  cand.forEach(function (w) {
+    var days = per[w.cls + '|' + w.seat]; if (!days) return;
+    var ds = Object.keys(days).sort(); if (ds.length < 3) return;
+    var last3 = ds.slice(-3); if (last3[2] < addDays_(today, -3)) return;
+    var ok = last3.every(function (d) { var v = days[d], f = v.co || v.ci; return f && f.c === 'green'; });
+    if (!ok) return;
+    fsh.appendRow([now_(), today, w.cls, w.seat, w.name, '情緒已回穩', '連續 3 天簽到綠色，系統自動結案', '系統']);
+    w.fu = { time: now_(), date: today, status: '情緒已回穩', note: '連續 3 天簽到綠色，系統自動結案', teacher: '系統' }; n++;
+  });
+  return n;
+}
+// ===== 每週週報（Email）=====
+// 每週第一個上課日早上自動寄：導師收到「本班上週摘要」，校長收到「全校摘要」。統計期間＝上週（到昨天為止的 7 天）。
+function weeklyDigest() { return weeklyDigest_(false); }
+function weeklyDigestNow() { Logger.log(JSON.stringify(weeklyDigest_(true))); }
+function weeklyDigest_(force) {
+  var today = today_();
+  if (!force) {
+    if (!isSchoolDay_(today)) return { skipped: 'noschool' };
+    if ((prop_('DIGEST_LAST') || '') >= weekStart_(today)) return { skipped: 'done' };   // 這週已經寄過
+  }
+  var st = stats_('', 7, addDays_(today, -1)), watch = st.watch || [], pct = function (x) { return Math.round((x || 0) * 100) + '%'; };
+  var dash = prop_('DASHBOARD_URL') || '', range = st.start + ' ～ ' + st.end;
+  var stateOf = function (w) { return w.fu ? '✓ ' + w.fu.status + '（' + w.fu.date.slice(5) + ' ' + w.fu.teacher + '）' : '尚未處理'; };
+  var classBlock = function (c) {
+    var ch = c.change || {}, mine = watch.filter(function (w) { return w.cls === c.cls; });
+    var t = [clsLabel_(c.cls) + '（上課 ' + st.schoolDays + ' 天）'];
+    if (!c.n) { t.push('・這段期間沒有任何簽到紀錄。'); }
+    else {
+      t.push('・簽到率：Check-in ' + pct(c.ciRate) + '、Check-out ' + pct(c.coRate));
+      t.push('・情緒（人次）：綠 ' + c.green + '、紅 ' + c.red + '、藍 ' + c.blue + '、黃 ' + c.yellow + '（負向 ' + pct(c.neg) + '）');
+      if (ch.both) t.push('・當天心情變化：好轉 ' + ch.improved + '、持平 ' + ch.same + '、轉換 ' + ch.shifted + '、轉差 ' + ch.worsened);
+    }
+    t.push(mine.length ? '・需要關心 ' + mine.length + ' 位：' : '・沒有需要特別關心的學生 👍');
+    mine.forEach(function (w) { t.push('　' + w.seat + '號 ' + w.name + '：' + w.why.join('；') + '｜' + stateOf(w)); });
+    return t.join('\n');
+  };
+  var byMail = {}, n = 0;
+  rows_('Teachers').forEach(function (r) {
+    var m = mailValid_(r['信箱']), c = String(r['班級']); if (!m) return;
+    var cs = (byMail[m] = byMail[m] || []); if (cs.indexOf(c) < 0) cs.push(c);
+  });
+  Object.keys(byMail).forEach(function (m) {
+    var blocks = byMail[m].sort().map(function (c) { var bc = st.byClass.filter(function (x) { return x.cls === c; })[0]; return bc ? classBlock(bc) : ''; }).filter(String);
+    if (!blocks.length || MailApp.getRemainingDailyQuota() < 1) return;
+    MailApp.sendEmail({ to: m, name: 'SEL 情緒簽到', subject: '【SEL 週報】' + range + ' 本班情緒摘要',
+      body: '統計期間：' + range + '\n\n' + blocks.join('\n\n') + (dash ? '\n\n看板：' + dash : '') + '\n\n※ 本信含學生個資，請勿轉寄。' });
+    n++;
+  });
+  var pm = mailValid_(prop_('PRINCIPAL_EMAIL')), principalSent = false;
+  if (pm && MailApp.getRemainingDailyQuota() >= 1) {
+    var tt = st.totals, unh = watch.filter(function (w) { return !w.fu; }).length, auto = 0;
+    rows_('Followups').forEach(function (r) { var d = dateStr_(r['日期']).slice(0, 10); if (d >= st.start && d <= st.end && String(r['教師']) === '系統') auto++; });
+    var lines = ['全校 ' + tt.n + ' 人次簽到；綠色 ' + pct(tt.n ? tt.green / tt.n : 0) + '、負向 ' + pct(tt.neg) + '。',
+      '持續關注 ' + watch.length + ' 位（尚未處理 ' + unh + ' 位）；系統自動結案 ' + auto + ' 位。', ''];
+    st.byClass.forEach(function (c) {
+      lines.push(clsLabel_(c.cls) + '｜簽到率 ' + pct(c.ciRate) + '／' + pct(c.coRate) + '｜負向 ' + pct(c.neg) + '｜當天轉差 ' + ((c.change && c.change.worsened) || 0) + (c.n ? '' : '｜⚠ 整週沒有簽到'));
+    });
+    if (watch.length) { lines.push('', '持續關注名單：'); watch.forEach(function (w) { lines.push('　' + clsLabel_(w.cls) + ' ' + w.seat + '號 ' + w.name + '：' + w.why.join('；') + '｜' + stateOf(w)); }); }
+    MailApp.sendEmail({ to: pm, name: 'SEL 情緒簽到', subject: '【SEL 全校週報】' + range,
+      body: '統計期間：' + range + '\n\n' + lines.join('\n') + (dash ? '\n\n看板：' + dash : '') + '\n\n※ 本信含學生個資，請勿轉寄。' });
+    principalSent = true;
+  }
+  if (!force) PropertiesService.getScriptProperties().setProperty('DIGEST_LAST', today);
+  return { teachers: n, principal: principalSent, watch: watch.length };
+}
+
+// 只需執行一次：建立兩個定時觸發器——每天 16:00 左右檢查預警、每天 07:00 左右檢查是否要寄本週週報（每週只寄一次）
+function setupAutomation() {
+  ScriptApp.getProjectTriggers().forEach(function (t) { var h = t.getHandlerFunction(); if (h === 'weeklyWarning' || h === 'weeklyDigest') ScriptApp.deleteTrigger(t); });
   ScriptApp.newTrigger('weeklyWarning').timeBased().everyDays(1).atHour(16).create();
-  Logger.log('已建立：每天 16:00 左右自動檢查（週六日略過）。立即試跑請執行 weeklyWarningNow。');
+  ScriptApp.newTrigger('weeklyDigest').timeBased().everyDays(1).atHour(7).create();
+  console.log('已建立：每天 16:00 左右預警檢查（含自動結案、升級）、每週第一個上課日 07:00 左右寄週報。立即試跑請執行 weeklyWarningNow、weeklyDigestNow。');
 }
+function setupWeeklyWarning() { setupAutomation(); }   // 舊名稱保留
 function weeklyWarningNow() { Logger.log(JSON.stringify(weeklyWarning_(true))); }
 
 // 前端以 text/plain 傳 JSON，避免 CORS 預檢
