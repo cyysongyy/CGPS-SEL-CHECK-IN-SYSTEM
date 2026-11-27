@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>輔導轉介摘要 · 辰光 SEL</title>
+<style>
+:root{--pri:#0f766e;--line:#e2e8f0;--mute:#64748b;--red:#e5484d;--blue:#3b82f6;--yellow:#f5b301;--green:#2fa86b}
+*{box-sizing:border-box}
+body{font-family:"Noto Sans TC","PingFang TC","Microsoft JhengHei",system-ui,sans-serif;margin:0;background:#f1f5f9;color:#0f172a;line-height:1.6}
+.bar{background:var(--pri);color:#fff;padding:10px 16px;display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.bar b{flex:1;min-width:140px}.bar select,.bar button{font:inherit;font-size:15px;padding:7px 10px;border-radius:10px;border:0}
+.page{max-width:820px;margin:14px auto;background:#fff;border-radius:14px;padding:22px 26px;box-shadow:0 1px 8px rgba(0,0,0,.08)}
+h1{font-size:21px;margin:0 0 2px}h2{font-size:16px;margin:20px 0 8px;border-left:5px solid var(--pri);padding-left:8px}
+.mute{color:var(--mute);font-size:13px}
+.kv{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px}
+.kv div{border:1px solid var(--line);border-radius:10px;padding:8px 10px}.kv b{display:block;font-size:20px}.kv span{font-size:12px;color:var(--mute)}
+.dist{display:flex;height:22px;border-radius:6px;overflow:hidden;margin:6px 0}.dist i{display:block}
+.leg{display:flex;gap:14px;flex-wrap:wrap;font-size:13px}.leg i{display:inline-block;width:11px;height:11px;border-radius:3px;margin-right:4px}
+table{width:100%;border-collapse:collapse;font-size:14px}th,td{text-align:left;padding:6px 6px;border-bottom:1px solid var(--line);vertical-align:middle}th{background:#f8fafc}
+.chg{font-size:12px;padding:2px 8px;border-radius:999px;font-weight:700}
+.chg.improved{background:#d1fae5;color:#047857}.chg.same{background:#e0f2fe;color:#0369a1}.chg.shifted{background:#fef3c7;color:#92400e}.chg.worsened{background:#fee2e2;color:#b91c1c}
+.log{border:1px solid var(--line);border-radius:8px;padding:6px 10px;margin:6px 0;font-size:14px}
+textarea{width:100%;font:inherit;font-size:15px;border:2px solid var(--line);border-radius:10px;padding:8px}
+.sign{display:flex;gap:40px;margin-top:28px}.sign div{flex:1;border-top:1px solid #0f172a;padding-top:4px;font-size:13px;color:var(--mute)}
+.foot{margin-top:18px;font-size:12px;color:var(--mute)}
+.err{max-width:820px;margin:30px auto;padding:0 16px;color:#b91c1c}
+.hide{display:none!important}
+@media print{.bar,.noprint{display:none!important}body{background:#fff}.page{box-shadow:none;margin:0;max-width:none;border-radius:0}textarea{border:1px solid #999;resize:none}.sec{break-inside:avoid}}
+</style>
+</head>
+<body>
+<div class="bar noprint"><b>📋 輔導轉介摘要</b>
+  <select id="days"><option value="14">近 14 天</option><option value="30" selected>近 30 天</option><option value="60">近 60 天</option><option value="90">近 90 天</option></select>
+  <button id="print">🖨 列印／存成 PDF</button><button onclick="window.close()">關閉</button></div>
+<div id="out"><div class="err" style="color:#64748b">產生中…</div></div>
+<script src="config.js"></script>
+<script src="faces.js"></script>
+<script>
+const GAS_URL=window.SEL_GAS_URL||'', DEMO=!GAS_URL||GAS_URL.startsWith('YOUR_');
+const $=id=>document.getElementById(id), Q=new URLSearchParams(location.search);
+const cls=Q.get('cls')||'', seat=+Q.get('seat')||0;
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const GZ=['','一','二','三','四','五','六'], clsLabel=c=>(GZ[c[0]]||c[0])+'年'+c.slice(1)+'班';
+const ZH={red:'紅·生氣',blue:'藍·沮喪',yellow:'黃·焦慮',green:'綠·平和'}, COL={red:'#e5484d',blue:'#3b82f6',yellow:'#f5b301',green:'#2fa86b'};
+const CHG_ZH={improved:'好轉',same:'持平',shifted:'轉換',worsened:'轉差'};
+const chgOf=(a,b)=>a===b?'same':b==='green'?'improved':a==='green'?'worsened':'shifted';
+const face=(e,s)=>window.SELFaces?SELFaces.html(e||'',s||22):esc(e||'');
+function passFromStorage(){
+  try{return sessionStorage.getItem('sel_pass')||sessionStorage.getItem('sel_ppass')||localStorage.getItem('sel_ppass_keep')||''}catch(e){return ''}
+}
+async function get(p){return (await fetch(GAS_URL+'?'+new URLSearchParams({...p,pass:passFromStorage()}))).json()}
+function loginForm(msg){
+  $('out').innerHTML=`<div class="page" style="max-width:380px"><h1>🔒 請先登入</h1><div class="mute" style="margin:6px 0 10px">輸入你的教師密碼（或校長密碼）。這一頁只在這個分頁暫存，關掉就會清除。</div>
+    <input id="pw" type="password" autocomplete="current-password" placeholder="密碼" style="width:100%;font:inherit;font-size:16px;padding:9px;border:2px solid var(--line);border-radius:10px">
+    <div style="color:#b91c1c;min-height:22px;margin:4px 0">${msg||''}</div><button id="pwGo" style="font:inherit;font-size:16px;padding:8px 18px;border:0;border-radius:10px;background:var(--pri);color:#fff">進入</button></div>`;
+  const go=()=>{const v=$('pw').value;if(!v)return;try{sessionStorage.setItem('sel_pass',v)}catch(e){}build()};
+  $('pwGo').onclick=go;$('pw').onkeydown=e=>{if(e.key==='Enter')go()};$('pw').focus();
+}
+function fail(msg){$('out').innerHTML=`<div class="err">${msg}</div>`}
+async function build(){
+  if(!cls||!seat)return fail('缺少班級或座號。請從老師看板的學生視窗，或校長總控台的班級表格進入。');
+  if(DEMO)return fail('展示模式不提供轉介摘要，部署 Apps Script 後即可使用。');
+  if(!passFromStorage())return loginForm();
+  const days=+$('days').value;
+  let h,t;
+  try{[h,t]=await Promise.all([get({action:'history',cls,seat,days}),get({action:'today',cls,date:new Date().toISOString().slice(0,10)})])}catch(e){return fail('連線失敗，請稍後再試。')}
+  if(h.error==='auth'||t.error==='auth'){try{sessionStorage.removeItem('sel_pass');sessionStorage.removeItem('sel_ppass');localStorage.removeItem('sel_ppass_keep')}catch(e){}return loginForm('密碼不正確，請再試一次。')}
+  if(!h.ok||!t.ok)return fail(h.error==='forbidden'||t.error==='forbidden'?'你沒有查看這個班級的權限。':'載入失敗：'+esc(h.error||t.error));
+  const me=(t.roster||[]).find(r=>r.seat===seat)||{name:''};
+  // 每天每種類型取最新一筆
+  const byDay={};(h.history||[]).sort((a,b)=>(a.date+a.time)<(b.date+b.time)?-1:1).forEach(x=>{(byDay[x.date]=byDay[x.date]||{})[x.kind]=x});
+  const dates=Object.keys(byDay).sort();
+  const all=[];dates.forEach(d=>['ci','co'].forEach(k=>{if(byDay[d][k])all.push({date:d,...byDay[d][k]})}));
+  const cnt={red:0,blue:0,yellow:0,green:0};all.forEach(x=>{if(cnt[x.color]!==undefined)cnt[x.color]++});
+  const n=all.length, neg=cnt.red+cnt.blue+cnt.yellow;
+  const emo={};all.forEach(x=>{if(x.emotion)emo[x.emotion]=(emo[x.emotion]||0)+1});
+  const topEmo=Object.entries(emo).sort((a,b)=>b[1]-a[1]).slice(0,5);
+  const chg={improved:0,same:0,shifted:0,worsened:0};
+  dates.forEach(d=>{const v=byDay[d];if(v.ci&&v.co)chg[chgOf(v.ci.color,v.co.color)]++});
+  const bothN=Object.values(chg).reduce((a,b)=>a+b,0);
+  // 最長連續「非綠」簽到日（以每天最新一筆）
+  let run=0,best=0,bestEnd='';dates.forEach(d=>{const v=byDay[d],last=v.co||v.ci;if(last.color!=='green'){run++;if(run>best){best=run;bestEnd=d}}else run=0});
+  const pct=x=>n?Math.round(x/n*100)+'%':'—';
+  const fus=(h.followups||[]).slice().reverse();
+  const tl=dates.slice().reverse().map(d=>{const v=byDay[d],c=(v.ci&&v.co)?chgOf(v.ci.color,v.co.color):'';
+    const cell=x=>x?`<span style="color:${COL[x.color]}">●</span> ${face(x.emotion,22)}`:'<span class="mute">—</span>';
+    return `<tr><td>${esc(d.slice(5))}</td><td>${cell(v.ci)}</td><td>${cell(v.co)}</td><td>${c?`<span class="chg ${c}">${CHG_ZH[c]}</span>`:''}</td><td>${esc([v.ci&&v.ci.note,v.co&&v.co.note].filter(Boolean).join('；'))}</td></tr>`}).join('');
+  const today=new Date().toLocaleDateString('zh-TW',{year:'numeric',month:'long',day:'numeric'});
+  $('out').innerHTML=`<div class="page">
+    <h1>學生情緒簽到摘要（輔導轉介用）</h1>
+    <div class="mute">辰光國小 · 產生日期 ${esc(today)} · 統計期間：近 ${days} 天（${dates.length?esc(dates[0])+' ～ '+esc(dates[dates.length-1]):'無簽到'}）</div>
+    <h2>基本資料</h2>
+    <div class="kv"><div><b>${esc(clsLabel(cls))} ${seat} 號</b><span>班級座號</span></div><div><b>${esc(me.name||'（未登錄姓名）')}</b><span>姓名</span></div><div><b>${dates.length} 天／${n} 次</b><span>簽到天數／次數</span></div></div>
+    <div class="sec"><h2>情緒分布</h2>
+    ${n?`<div class="dist">${['red','blue','yellow','green'].map(k=>cnt[k]?`<i style="width:${cnt[k]/n*100}%;background:${COL[k]}"></i>`:'').join('')}</div>
+    <div class="leg">${['red','blue','yellow','green'].map(k=>`<span><i style="background:${COL[k]}"></i>${ZH[k]} ${cnt[k]} 次（${pct(cnt[k])}）</span>`).join('')}</div>
+    <div class="kv" style="margin-top:10px"><div><b>${pct(neg)}</b><span>負向情緒（紅＋藍＋黃）</span></div><div><b>${cnt.red} 次</b><span>紅色（生氣）</span></div><div><b>${best} 天</b><span>最長連續非綠${best?'（至 '+esc(bestEnd.slice(5))+'）':''}</span></div></div>
+    <div style="margin-top:8px">最常出現的情緒：${topEmo.length?topEmo.map(([e,c])=>`<span style="margin-right:12px;white-space:nowrap">${face(e,20)} ×${c}</span>`).join(''):'—'}</div>`:'<div class="mute">這段期間沒有簽到紀錄。</div>'}</div>
+    <div class="sec"><h2>當天心情變化（Check-in → Check-out）</h2>
+    ${bothN?`<div class="kv">${['improved','same','shifted','worsened'].map(k=>`<div><b>${chg[k]} 天</b><span><span class="chg ${k}">${CHG_ZH[k]}</span></span></div>`).join('')}</div>`:'<div class="mute">沒有「同一天 Check-in 和 Check-out 都簽到」的紀錄。</div>'}</div>
+    <div class="sec"><h2>每日簽到紀錄</h2>${dates.length?`<table><tr><th>日期</th><th>👋 Check-in</th><th>🏁 Check-out</th><th>變化</th><th>留言</th></tr>${tl}</table>`:'<div class="mute">無</div>'}</div>
+    <div class="sec"><h2>導師／輔導處理紀錄</h2>${fus.length?fus.map(f=>`<div class="log"><b>${esc(f.status)}</b>　${esc(f.time)}　${esc(f.teacher)}${f.note?'<br>'+esc(f.note):''}</div>`).join(''):'<div class="mute">尚無處理紀錄。</div>'}</div>
+    <div class="sec"><h2>轉介原因與導師觀察（可直接輸入，列印時一併輸出）</h2><textarea id="reason" rows="5" placeholder="例如：近兩週多次選擇紅色，午休時與同學衝突，家長最近……"></textarea></div>
+    <div class="sign"><div>導師簽章</div><div>輔導老師簽章</div><div>日期</div></div>
+    <div class="foot">※ 本摘要僅依學生自行簽到的情緒紀錄整理，供輔導參考，不等於診斷。含學生個資，請妥善保管，勿轉傳或張貼。</div></div>`;
+}
+$('days').onchange=build;$('print').onclick=()=>window.print();build();
+</script>
+</body>
+</html>

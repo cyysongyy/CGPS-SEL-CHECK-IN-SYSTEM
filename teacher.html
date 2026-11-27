@@ -288,6 +288,7 @@ async function openStudent(seat){
     <div class="hist">${days.map(d=>`<div class="dot ${byDay[d]?byDay[d].color:''}" title="${d}">${d.slice(8)}</div>`).join('')}</div>
     ${notes.length?'<div class="mute">近期留言</div>'+notes.map(n=>`<div class="log">${esc(n.date)}：${esc(n.note)}</div>`).join(''):''}
     <hr style="border:0;border-top:1px solid var(--line);margin:12px 0">
+    <div style="margin-bottom:10px"><a class="btn g" style="display:inline-block;text-decoration:none" href="referral.html?cls=${encodeURIComponent(cls)}&seat=${seat}&days=30" target="_blank">📋 輔導轉介摘要（可列印）</a></div>
     <b>📝 新增處遇紀錄</b>
     <select id="fuStatus">${FOLLOW_STATUS.map(x=>`<option>${x}</option>`).join('')}</select>
     <textarea id="fuNote" rows="3" placeholder="處遇內容、與學生的對話、後續計畫…"></textarea>
